@@ -11,6 +11,7 @@ from multiprocessing import Pool
 from time import time
 import logging
 
+
 np.set_printoptions(linewidth=200)
 
 DEBUG = True
@@ -197,6 +198,7 @@ def find_lines_on_image(gray_np_image, direction):
     "играть параметрами"
     """
     if direction not in ('horizontal', 'vertical'):
+        logging.error('horizontal or vertical, please')
         raise ValueError('horizontal or vertical, please')
     im_height, im_width = gray_np_image.shape
     # Каждый пиксель будет размыт до квадрата с такой стороной
@@ -212,6 +214,7 @@ def find_lines_on_image(gray_np_image, direction):
         dilate_parm = (1, MIN_LINE_LEN)
         erode_parm = (EXPAND_LINE_WID, EXPAND_LINE_LEN)
     else:
+        logging.error('direction must be "horizontal" or "vertical"')
         raise ValueError('direction must be "horizontal" or "vertical"')
     # Немного "размажем"
     img_copy = cv2.erode(gray_np_image, cv2.getStructuringElement(cv2.MORPH_RECT, (ERODE_SIZE, ERODE_SIZE)))
