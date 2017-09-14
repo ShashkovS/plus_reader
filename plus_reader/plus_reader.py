@@ -4,15 +4,15 @@ import io
 import os
 import zlib
 import cv2  # pip install --upgrade opencv-python
-import numpy as np  # numpy
+import numpy as np  # conda install numpy
 import PyPDF2  # pip install --upgrade pypdf2
-import xlwt  # xlwt
+import xlwt  # pip install --upgrade xlwt
 from PIL import Image  # pip install --upgrade pillow
 from multiprocessing import Pool
 from time import time
 np.set_printoptions(linewidth=200)
 
-VERBOSE = False
+VERBOSE = True
 # TODO: Переделать разные принты на logging
 
 
@@ -45,10 +45,15 @@ def extract_images_from_pdf(pdf_filename, pages_to_process=None):
     и возвращающий их в формате Pillow Image
     """
     with open(pdf_filename, 'rb') as pdf_file:
-        # TODO: Избавиться от зависимости PyPDF2, парсить pdf "руками". Возвращать генераторы на картинки
         # TODO: Прикрутить обработку всех стандартов:
         # TODO: ASCIIHexDecode ASCII85Decode LZWDecode FlateDecode RunLengthDecode CCITTFaxDecode JBIG2Decode DCTDecode JPXDecode
         # TODO: Вот дока: http://www.adobe.com/content/dam/Adobe/en/devnet/acrobat/pdfs/pdf_reference_1-7.pdf, стр. 67
+        # TODO: Самое сложное — JBIG2Decode, это достаточно новый формат с непростым кодированием
+        # TODO: Реализация на js: https://github.com/mozilla/pdf.js/blob/ca936ee0c7ac5baeca76a45dfc5485b3607de290/src/core/jbig2.js
+        # TODO: Хорошая реализация на C: http://www.artifex.com/jbig2dec/download/jbig2dec-0.13.tar.gz
+        # TODO: Реализация на .NET: https://github.com/devteamexpress/JBig2Decoder.NET
+        # TODO: После того, как будут реализованы все стандарты, из этого нужно будет сделать отдельную либу.
+        # TODO: В данный момент аналогов нет, будет новьё. И статью на habr о мучениях в процессе
         cond_scan_reader = PyPDF2.PdfFileReader(pdf_file)
         if pages_to_process is None:
             pages_to_process = range(0, cond_scan_reader.getNumPages())
@@ -393,4 +398,9 @@ def prc_all_images(iterable_of_pil_images, njobs=1):
 
 if __name__ == '__main__':
     pass
+    # Исключительно для отладки:
+    os.chdir(r'tests\test_imgs&pdfs')
+    images = extract_images_from_pdf('tst_01.pdf', pages_to_process=[0, 1])
+    recognized_pages = prc_all_images(images)
+
 
