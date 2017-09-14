@@ -6,14 +6,18 @@ import zlib
 import cv2  # pip install --upgrade opencv-python
 import numpy as np  # conda install numpy
 import PyPDF2  # pip install --upgrade pypdf2
-import xlwt  # pip install --upgrade xlwt
 from PIL import Image  # pip install --upgrade pillow
 from multiprocessing import Pool
 from time import time
+import logging
+
 np.set_printoptions(linewidth=200)
 
-VERBOSE = True
-# TODO: Переделать разные принты на logging
+DEBUG = True
+if DEBUG:
+    logging.basicConfig(format = u'%(levelname)-8s [%(asctime)s] %(message)s', level = logging.DEBUG, filename = u'mylog.log')
+else:
+    logging.basicConfig(format = u'%(levelname)-8s [%(asctime)s] %(message)s', level = logging.INFO, filename = u'mylog.log')
 
 
 def _tiff_header_for_CCITT(width, height, img_size, CCITT_group=4):
@@ -100,7 +104,7 @@ def align_image(img):
     """
     # TODO: Этот кусок работает дико медленно и занимает большую часть времени
     # TODO: Скорее всего можно определять угол поворота как-нибудь быстрее
-    print('Aligning image...')
+    logging.info('Aligning image...')
     rows, cols = img.shape
 
     def try_angles(angles, sv, ev):
@@ -123,8 +127,7 @@ def align_image(img):
         best_angle = xx[mx]
     M = cv2.getRotationMatrix2D((cols/2,rows/2),best_angle,1)
     dst = cv2.warpAffine(img, M, (cols, rows), flags=cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS, borderValue=255)
-    if VERBOSE:
-        print('Best angle =', best_angle, ' Penalty=', yy[mx])
+    logging.info(str('Best angle = ') + str(best_angle) + str(' Penalty= ') + str(yy[mx]))
     return dst
 
 
@@ -182,7 +185,7 @@ def remove_dots_from_image(gray_np_image):
     clean3 = cv2.dilate(gray_np_image, cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2)))
     clean = clean1 & clean2 & clean3
     clean = cv2.erode(clean, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
-    if VERBOSE: cv2.imwrite("_clean.png", clean)
+    if DEBUG: cv2.imwrite("_clean.png", clean)
     return clean
 
 
@@ -212,15 +215,15 @@ def find_lines_on_image(gray_np_image, direction):
         raise ValueError('direction must be "horizontal" or "vertical"')
     # Немного "размажем"
     img_copy = cv2.erode(gray_np_image, cv2.getStructuringElement(cv2.MORPH_RECT, (ERODE_SIZE, ERODE_SIZE)))
-    if VERBOSE: cv2.imwrite('_' + direction + "1.png", img_copy)
+    if DEBUG: cv2.imwrite('_' + direction + "1.png", img_copy)
     # Теперь оставим только то, что представляет собой "длинную" линию
     img_copy = cv2.dilate(img_copy, cv2.getStructuringElement(cv2.MORPH_RECT, dilate_parm))
-    if VERBOSE: cv2.imwrite('_' + direction + "2.png", img_copy)
+    if DEBUG: cv2.imwrite('_' + direction + "2.png", img_copy)
     # И назад растянем
     img_copy = cv2.erode(img_copy, cv2.getStructuringElement(cv2.MORPH_RECT, erode_parm))
-    if VERBOSE: cv2.imwrite('_' + direction + "3.png", img_copy)
+    if DEBUG: cv2.imwrite('_' + direction + "3.png", img_copy)
     img_copy = cv2.dilate(img_copy, cv2.getStructuringElement(cv2.MORPH_RECT, dilate_parm))
-    if VERBOSE: cv2.imwrite('_' + direction + "4.png", img_copy)
+    if DEBUG: cv2.imwrite('_' + direction + "4.png", img_copy)
     return img_copy
 
 
@@ -241,7 +244,7 @@ def mark_plus(gray_np_image, horizontal_lines, vertical_lines):
     plus = np.minimum(plus, gray_np_image)
     # Очистим точки в границах таблицы, чтобы не мешались
     plus |= ~table_mask
-    if VERBOSE: cv2.imwrite("_plus.png", plus); cv2.imwrite("_table_mask.png", table_mask);
+    if DEBUG: cv2.imwrite("_plus.png", plus); cv2.imwrite("_table_mask.png", table_mask);
     return plus
 
 
@@ -271,10 +274,10 @@ def calcutale_lines_coords(horizontal_lines, vertical_lines):
                 ans.append((bl_en + bl_st) // 2)
                 bl_st, bl_en = -1, -1
         return ans
-    print('Finding centers')
+    logging.info('Finding centers')
     hor = prc(hor_l)
     vert = prc(vert_l)
-    if VERBOSE:  # Рисуем получившуюся табличку
+    if DEBUG:  # Рисуем получившуюся табличку
         lines = horizontal_lines.copy()
         lines.fill(255)
         for i in hor:
@@ -393,8 +396,8 @@ def prc_all_images(iterable_of_pil_images, njobs=1):
         prc_pool = Pool(njobs)
         recognized_pages = prc_pool.map(prc_one_image, iterable_of_pil_images)
     ent = time()
-    if VERBOSE:
-        print('Done in ', ent - stt)
+    if DEBUG:
+        logging.info('Done in ' + str(ent - stt))
     return recognized_pages
 
 
