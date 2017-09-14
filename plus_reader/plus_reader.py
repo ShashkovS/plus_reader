@@ -13,6 +13,7 @@ from time import time
 np.set_printoptions(linewidth=200)
 
 VERBOSE = False
+# TODO: Переделать разные принты на logging
 
 
 def _tiff_header_for_CCITT(width, height, img_size, CCITT_group=4):
@@ -39,13 +40,19 @@ def _tiff_header_for_CCITT(width, height, img_size, CCITT_group=4):
                        )
 
 
-def extract_images_from_pdf(pdf_filename):
+def extract_images_from_pdf(pdf_filename, pages_to_process=None):
     """Генератор, извлекающий все изображения из pdf-файла
     и возвращающий их в формате Pillow Image
     """
     with open(pdf_filename, 'rb') as pdf_file:
+        # TODO: Избавиться от зависимости PyPDF2, парсить pdf "руками". Возвращать генераторы на картинки
+        # TODO: Прикрутить обработку всех стандартов:
+        # TODO: ASCIIHexDecode ASCII85Decode LZWDecode FlateDecode RunLengthDecode CCITTFaxDecode JBIG2Decode DCTDecode JPXDecode
+        # TODO: Вот дока: http://www.adobe.com/content/dam/Adobe/en/devnet/acrobat/pdfs/pdf_reference_1-7.pdf, стр. 67
         cond_scan_reader = PyPDF2.PdfFileReader(pdf_file)
-        for i in range(0, cond_scan_reader.getNumPages()):  # цикл по всем страницам
+        if pages_to_process is None:
+            pages_to_process = range(0, cond_scan_reader.getNumPages())
+        for i in pages_to_process:  # цикл по всем страницам
             page = cond_scan_reader.getPage(i)  # Получаем текущую страницу
             xObject = page['/Resources']['/XObject'].getObject()  # Извлекаем неё ресурсы
             for obj in xObject:  # Перебираем все объеты, нам нужна картинка
@@ -83,6 +90,8 @@ def extract_images_from_pdf(pdf_filename):
 
 def align_image(img):
     """Выровнять изображение.
+    Идея подхода в следующем: рассмотрим несколько разных поворотов и выберем из них "лучший".
+    Лучший — это тот, в котором "горизонтальные" линии занимают меньше всего места по вертикали.
     """
     print('Aligning image...')
     rows, cols = img.shape
@@ -107,11 +116,12 @@ def align_image(img):
         best_angle = xx[mx]
     M = cv2.getRotationMatrix2D((cols/2,rows/2),best_angle,1)
     dst = cv2.warpAffine(img, M, (cols, rows), flags=cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS, borderValue=255)
-    print('Best angle =', best_angle, ' Penalty=', yy[mx])
+    if VERBOSE:
+        print('Best angle =', best_angle, ' Penalty=', yy[mx])
     return dst
 
 
-def scan_image_generator():
+def scan_image_generator(pdf_filename):
     """Генератор, возвращающий последовательность изображений для распознавания.
     в формате numpy ndarrray в черно-белом формате.
     Например, в виде (здесь 255 --- это белый, 0 --- чёрный)
@@ -121,8 +131,9 @@ def scan_image_generator():
     Может брать данные из pdf или напрямую из сканированных картинок
     """
     BITMAP_BORDER = 150
-    for img in extract_images_from_pdf(PDF_FILENAME):
+    for img in extract_images_from_pdf(pdf_filename):
         ar = np.array(img.convert("L"))  # Делаем ч/б
+        # TODO: С поворотом здесь какой-то треш. Это должно быть вынесено в extract_images_from_pdf
         if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
             ar = ar.T[::-1, :]
         ar = align_image(ar)
@@ -140,6 +151,7 @@ def img_to_bitmap_np(img):
            [ 255.,  255.,  255.,  255.,  255.]])
     """
     ar = np.array(img.convert("L"))  # Делаем ч/б
+    # TODO: С поворотом здесь какой-то треш. Это должно быть вынесено в extract_images_from_pdf
     if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
         ar = ar.T[::-1, :]
     ar = align_image(ar)
@@ -178,6 +190,7 @@ def find_lines_on_image(gray_np_image, direction):
         raise ValueError('horizontal or vertical, please')
     im_height, im_width = gray_np_image.shape
     # Каждый пиксель будет размыт до квадрата с такой стороной
+    # TODO: Здесь мутные константы, которые я подбирал руками для наших кондуитов. Это — треш
     ERODE_SIZE = round((im_width + im_height) / 600)
     MIN_LINE_LEN = round((im_width + im_height) / 15)
     EXPAND_LINE_LEN = round((im_width + im_height) / 6)
@@ -188,6 +201,8 @@ def find_lines_on_image(gray_np_image, direction):
     elif direction == 'vertical':
         dilate_parm = (1, MIN_LINE_LEN)
         erode_parm = (EXPAND_LINE_WID, EXPAND_LINE_LEN)
+    else:
+        raise ValueError('direction must be "horizontal" or "vertical"')
     # Немного "размажем"
     img_copy = cv2.erode(gray_np_image, cv2.getStructuringElement(cv2.MORPH_RECT, (ERODE_SIZE, ERODE_SIZE)))
     if VERBOSE: cv2.imwrite('_' + direction + "1.png", img_copy)
@@ -213,6 +228,7 @@ def mark_plus(gray_np_image, horizontal_lines, vertical_lines):
     plus = (gray_np_image | ~table_mask)  # Убрали из изображения сами линии
     # Замажем чёрным всё, в окрестности чего много точек.
     # Почти все плюсы превратятся в "жирные" кляксы
+    # TODO: Здесь мутные константы, которые я подбирал руками для наших кондуитов. Это — треш
     plus = ~cv2.adaptiveThreshold(plus, 210, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 27, -9)
     # Вернём наместро сами плюсы
     plus = np.minimum(plus, gray_np_image)
@@ -269,8 +285,9 @@ def calcutale_lines_coords(horizontal_lines, vertical_lines):
 
 
 def find_filled_cells(gray_np_image, hor, vert):
+    """Самая главная функция — определяет, заполнена ли ячейка
     """
-    """
+    # TODO: убрать магические константы
     MIN_FILLED_PART = 0.10
     MIN_FILLED_DOTS = gray_np_image.size / 9000
     BLACK_DOT_THRESHOLD = 80
@@ -287,22 +304,24 @@ def find_filled_cells(gray_np_image, hor, vert):
 
 def unmark_useless_cells(filled_cells):
     # Лично у нас первая и последняя строка, а также нулевой и второй столбец отмечать не нужно
-    filled_cells[filled_cells[:, 2] == False, :] = False
-    filled_cells[:, 0] = False
-    filled_cells[0, :] = False
-    filled_cells[-1, :] = False
+    # TODO: здесь мутный хардкод под наши кондуиты. Это должно быть как-то переделано
+    # filled_cells[filled_cells[:, 2] == False, :] = False
+    # filled_cells[:, 0] = False
+    # filled_cells[0, :] = False
+    # filled_cells[-1, :] = False
     return filled_cells
 
 
 def remove_useless_cells(filled_cells):
     # Лично у нас первая и последняя строка, а также первый столбец не нужны
     # Кроме того, вовсе удалим строки, в которых не заполнена фамилия.
-    filled_cells = filled_cells[1:-1, 1:]
-    filled_cells = filled_cells[filled_cells[:, 1] == True, :]
-    filled_cells = np.delete(filled_cells, 1, axis=1)  # Здесь столбец с фамилией
-    print('*'*100)
-    print(filled_cells.astype(int))
-    print('*'*100)
+    # TODO: здесь мутный хардкод под наши кондуиты. Это должно быть как-то переделано
+    # filled_cells = filled_cells[1:-1, 1:]
+    # filled_cells = filled_cells[filled_cells[:, 1] == True, :]
+    # filled_cells = np.delete(filled_cells, 1, axis=1)  # Здесь столбец с фамилией
+    # print('*'*100)
+    # print(filled_cells.astype(int))
+    # print('*'*100)
     return filled_cells
 
 
@@ -318,7 +337,7 @@ def mark_filled_cells(gray_np_image, filled_cells, hor, vert):
     return cv2.addWeighted(clrd, .7, clrd_r, .3, 0)
 
 
-def prc_conduit(gray_np_image, save_marked_name=None):
+def prc_one_prepared_image(gray_np_image, save_marked_name=None):
     """
     Распознаёт кондуит в ЧБ-изображении, переданном в виде numpy ndarray'я.
     Возвращает список списков [номер листа, номер строки, None, список результатов], например,
@@ -343,21 +362,35 @@ def prc_conduit(gray_np_image, save_marked_name=None):
     return filled_cells
 
 
-def parallel_prc_conduit(parm, res_list=None):
-    pgnum, pil_image = parm
+def prc_one_image(pil_image, pgnum=[0], res_list=None):
+    """Полностью обработать одну страницу (изображение в формате PIL)"""
+    if isinstance(pgnum, list):
+        # Используется хук для того, чтобы использовать уникальные номера
+        use_pgnum = pgnum[0]
+        pgnum[0] += 1
+    else:
+        use_pgnum = pgnum
     gray_np_image = img_to_bitmap_np(pil_image)
-    filled_cells = prc_conduit(gray_np_image, save_marked_name="sum_page_{}.png".format(pgnum))
+    # TODO: пока безусловное сохранение в save_marked_name — это треш
+    filled_cells = prc_one_prepared_image(gray_np_image, save_marked_name="sum_page_{}.png".format(pgnum))
     filled_cells = remove_useless_cells(filled_cells)
     # res_list[pgnum] = filled_cells
     return filled_cells
 
 
-if __name__ == '__main__':
+def prc_all_images(iterable_of_pil_images, njobs=1):
     stt = time()
-    # my_pool = Pool(20)
-    # print(my_pool)
-    # recognized_pages = my_pool.map(parallel_prc_conduit, enumerate(extract_images_from_pdf(PDF_FILENAME)))
-    recognized_pages = [parallel_prc_conduit(pair) for pair in enumerate(extract_images_from_pdf(PDF_FILENAME))]
-    print(recognized_pages)
-    print('Done in ', time() - stt)
+    if njobs == 1:
+        recognized_pages = [prc_one_image(image, pg_num) for pg_num, image in enumerate(iterable_of_pil_images)]
+    else:
+        prc_pool = Pool(njobs)
+        recognized_pages = prc_pool.map(prc_one_image, iterable_of_pil_images)
+    ent = time()
+    if VERBOSE:
+        print('Done in ', ent - stt)
+    return recognized_pages
+
+
+if __name__ == '__main__':
+    pass
 

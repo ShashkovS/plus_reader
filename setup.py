@@ -20,7 +20,9 @@ AUTHOR = 'Sergey Shashkov'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    'cv2', 'numpy', 'PyPDF2', 'PIL'
+    'numpy', 'PyPDF2',
+    # 'opencv-python', 'pillow',
+    'cv2', 'PIL'  # which one?
 ]
 
 # The rest you shouldn't have to touch too much :)
