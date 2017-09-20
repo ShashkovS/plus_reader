@@ -1,4 +1,5 @@
 build/
 dist/
 plus_reader.egg-info/
-plus_reader/__pycache__/
+**/__pycache__/
+
