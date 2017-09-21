@@ -48,6 +48,10 @@ def _tiff_header_for_CCITT(width, height, img_size, CCITT_group=4):
 def extract_images_from_pdf(pdf_filename, pages_to_process=None):
     """Генератор, извлекающий все изображения из pdf-файла
     и возвращающий их в формате Pillow Image
+    Изображение в pdf согласно стандарту может быть закодировано одним из следующих способов:
+    ASCIIHexDecode ASCII85Decode LZWDecode FlateDecode RunLengthDecode CCITTFaxDecode JBIG2Decode JPXDecode
+    Для каждого их них свой способ декодирования. Также после кодирования результат может быть сжат.
+    Тогда указывается ещё и DCTDecode
     """
     with open(pdf_filename, 'rb') as pdf_file:
         # TODO: Прикрутить обработку всех стандартов:
@@ -180,7 +184,9 @@ def img_to_bitmap_np(img):
 
 
 def remove_dots_from_image(gray_np_image):
-    """Удаляет мелкий сор из изображения"""
+    """Удаляет мелкий сор из изображения
+    Удаляем все точки, у которых нет достаточно убедительных соседей
+    """
     clean1 = cv2.dilate(gray_np_image, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1)))
     clean2 = cv2.dilate(gray_np_image, cv2.getStructuringElement(cv2.MORPH_RECT, (1, 3)))
     clean3 = cv2.dilate(gray_np_image, cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2)))
@@ -316,6 +322,8 @@ def find_filled_cells(gray_np_image, hor, vert):
 
 
 def unmark_useless_cells(filled_cells):
+    """Может оказаться, что в таблице некоторые строки всегда заполнены. И нам не итересно, заполнены ли они.
+    Эта фукнция снимает с них отметки, например, для того, чтобы эти ячейки не подсвечивались как заполненные"""
     # Лично у нас первая и последняя строка, а также нулевой и второй столбец отмечать не нужно
     # TODO: здесь мутный хардкод под наши кондуиты. Это должно быть как-то переделано
     # filled_cells[filled_cells[:, 2] == False, :] = False
@@ -326,6 +334,7 @@ def unmark_useless_cells(filled_cells):
 
 
 def remove_useless_cells(filled_cells):
+    """Часть ячеек нас совершенно не интересует. Удалим из итоговой выдачи"""
     # Лично у нас первая и последняя строка, а также первый столбец не нужны
     # Кроме того, вовсе удалим строки, в которых не заполнена фамилия.
     # TODO: здесь мутный хардкод под наши кондуиты. Это должно быть как-то переделано
@@ -339,6 +348,8 @@ def remove_useless_cells(filled_cells):
 
 
 def mark_filled_cells(gray_np_image, filled_cells, hor, vert):
+    """Отмаркировать ячейки, которые распознались как заполненные
+    (заливка жёлтым с прозрачностью 0.3)"""
     clrd = cv2.cvtColor(gray_np_image, cv2.COLOR_GRAY2BGR)
     clrd_r = clrd.copy()
     for i in range(len(hor) - 1):
