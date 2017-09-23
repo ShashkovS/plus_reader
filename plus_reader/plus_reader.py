@@ -146,8 +146,8 @@ def scan_image_generator(pdf_filename):
     for img in extract_images_from_pdf(pdf_filename):
         ar = np.array(img.convert("L"))  # Делаем ч/б
         # TODO: С поворотом здесь какой-то треш. Это должно быть вынесено в extract_images_from_pdf
-        if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
-            ar = ar.T[::-1, :]
+        # if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
+        #     ar = ar.T[::-1, :]
         ar = align_image(ar)
         ar_bit = np.zeros_like(ar)
         ar_bit[ar > BITMAP_BORDER] = 255
@@ -319,10 +319,10 @@ def find_filled_cells(gray_np_image, hor, vert):
 def unmark_useless_cells(filled_cells):
     # Лично у нас первая и последняя строка, а также нулевой и второй столбец отмечать не нужно
     # TODO: здесь мутный хардкод под наши кондуиты. Это должно быть как-то переделано
-    # filled_cells[filled_cells[:, 2] == False, :] = False
-    # filled_cells[:, 0] = False
-    # filled_cells[0, :] = False
-    # filled_cells[-1, :] = False
+    filled_cells[filled_cells[:, 2] == False, :] = False
+    filled_cells[:, 0] = False
+    filled_cells[0, :] = False
+    filled_cells[-1, :] = False
     return filled_cells
 
 
@@ -330,12 +330,12 @@ def remove_useless_cells(filled_cells):
     # Лично у нас первая и последняя строка, а также первый столбец не нужны
     # Кроме того, вовсе удалим строки, в которых не заполнена фамилия.
     # TODO: здесь мутный хардкод под наши кондуиты. Это должно быть как-то переделано
-    # filled_cells = filled_cells[1:-1, 1:]
-    # filled_cells = filled_cells[filled_cells[:, 1] == True, :]
-    # filled_cells = np.delete(filled_cells, 1, axis=1)  # Здесь столбец с фамилией
-    # print('*'*100)
-    # print(filled_cells.astype(int))
-    # print('*'*100)
+    filled_cells = filled_cells[1:-1, 1:]
+    filled_cells = filled_cells[filled_cells[:, 1] == True, :]
+    filled_cells = np.delete(filled_cells, 1, axis=1)  # Здесь столбец с фамилией
+    logging.info('*'*100)
+    logging.info(filled_cells.astype(int))
+    logging.info('*'*100)
     return filled_cells
 
 
@@ -368,15 +368,23 @@ def prc_one_prepared_image(gray_np_image, save_marked_name=None):
     vertical_lines = find_lines_on_image(gray_np_image, 'vertical')
     # Вычисляем координаты узлов сетки
     horizontal_coords, vertical_coords = calcutale_lines_coords(horizontal_lines, vertical_lines)
-    plus = mark_plus(clean, horizontal_lines, vertical_lines)  #
+    plus = mark_plus(clean, horizontal_lines, vertical_lines)
     filled_cells = find_filled_cells(plus, horizontal_coords, vertical_coords)
     if save_marked_name:
         colored = mark_filled_cells(gray_np_image, unmark_useless_cells(filled_cells), horizontal_coords, vertical_coords)
         cv2.imwrite(save_marked_name, colored)
+    return filled_cells, horizontal_coords, vertical_coords
+
+
+def feature_qt(pil_image, gray_np_image, vertical_coords, horizontal_coords, filled_cells):
+
+
+
     return filled_cells
 
-
-def prc_one_image(pil_image, pgnum=[0], res_list=None):
+def prc_one_image(pil_image, pgnum=[0]):
+    # TODO delete it
+    global im, vert, hor, cel
     """Полностью обработать одну страницу (изображение в формате PIL)"""
     if isinstance(pgnum, list):
         # Используется хук для того, чтобы использовать уникальные номера
@@ -386,8 +394,14 @@ def prc_one_image(pil_image, pgnum=[0], res_list=None):
         use_pgnum = pgnum
     gray_np_image = img_to_bitmap_np(pil_image)
     # TODO: пока безусловное сохранение в save_marked_name — это треш
-    filled_cells = prc_one_prepared_image(gray_np_image, save_marked_name="sum_page_{}.png".format(pgnum))
+    filled_cells, horizontal_coords, vertical_coords = prc_one_prepared_image(gray_np_image, save_marked_name="sum_page_{}.png".format(pgnum))
+    print(horizontal_coords, vertical_coords)
     filled_cells = remove_useless_cells(filled_cells)
+    filled_cells = feature_qt(pil_image, gray_np_image, vertical_coords, horizontal_coords, filled_cells)
+    # TODO delete
+    im = gray_np_image
+    vert, hor = vertical_coords, horizontal_coords
+    cel = filled_cells
     # res_list[pgnum] = filled_cells
     return filled_cells
 
@@ -409,6 +423,6 @@ if __name__ == '__main__':
     pass
     # Исключительно для отладки:
     os.chdir(r'tests\test_imgs&pdfs')
-    images = extract_images_from_pdf('tst_01.pdf', pages_to_process=[0, 1])
+    images = extract_images_from_pdf(r'C:/Users/s22b_abishev.SCH179/Downloads/_сканы кондуитов 2015/MX-M260_20160126_000834.pdf')
     recognized_pages = prc_all_images(images)
-    GUI.show('sum_page_1.png')
+    GUI.show('sum_page_0.png')
