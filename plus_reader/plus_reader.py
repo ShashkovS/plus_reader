@@ -2,14 +2,13 @@
 import io
 import logging
 import os
-import struct
-import zlib
-from multiprocessing import Pool
-from time import time
-
-import PyPDF2  # pip install --upgrade pypdf2
 import cv2  # pip install --upgrade opencv-python
 import numpy as np  # conda install numpy
+from multiprocessing import Pool
+from time import time
+from image_iterator import extract_images_from_files
+import logging
+
 from PIL import Image  # pip install --upgrade pillow
 import GUI
 
@@ -17,86 +16,9 @@ np.set_printoptions(linewidth=200)
 
 DEBUG = True
 if DEBUG:
-    logging.basicConfig(format = u'%(levelname)-8s [%(asctime)s] %(message)s', level = logging.DEBUG, filename = u'mylog.log')
+    logging.basicConfig(format = u'%(levelname)-8s [%(asctime)s] %(message)s', level = logging.DEBUG)
 else:
-    logging.basicConfig(format = u'%(levelname)-8s [%(asctime)s] %(message)s', level = logging.INFO, filename = u'mylog.log')
-
-
-def _tiff_header_for_CCITT(width, height, img_size, CCITT_group=4):
-    """Функция формирует заголовок TIFF файла, данные изображения которого
-    закодированы в CCITT group 4.
-    Используется для восстановления изображения из данных pdf-файла,
-    в котором в соответствии с форматом вырезаются заголовки
-    """
-    tiff_header_struct = '<' + '2s' + 'h' + 'l' + 'h' + 'hhll' * 8 + 'h'
-    return struct.pack(tiff_header_struct,
-                       b'II',  # Byte order indication: Little indian
-                       42,  # Version number (always 42)
-                       8,  # Offset to first IFD
-                       8,  # Number of tags in IFD
-                       256, 4, 1, width,  # ImageWidth, LONG, 1, width
-                       257, 4, 1, height,  # ImageLength, LONG, 1, lenght
-                       258, 3, 1, 1,  # BitsPerSample, SHORT, 1, 1
-                       259, 3, 1, CCITT_group,  # Compression, SHORT, 1, 4 = CCITT Group 4 fax encoding
-                       262, 3, 1, 0,  # Threshholding, SHORT, 1, 0 = WhiteIsZero
-                       273, 4, 1, struct.calcsize(tiff_header_struct),  # StripOffsets, LONG, 1, len of header
-                       278, 4, 1, height,  # RowsPerStrip, LONG, 1, lenght
-                       279, 4, 1, img_size,  # StripByteCounts, LONG, 1, size of image
-                       0  # last IFD
-                       )
-
-
-def extract_images_from_pdf(pdf_filename, pages_to_process=None):
-    """Генератор, извлекающий все изображения из pdf-файла
-    и возвращающий их в формате Pillow Image
-    """
-    with open(pdf_filename, 'rb') as pdf_file:
-        # TODO: Прикрутить обработку всех стандартов:
-        # TODO: ASCIIHexDecode ASCII85Decode LZWDecode FlateDecode RunLengthDecode CCITTFaxDecode JBIG2Decode DCTDecode JPXDecode
-        # TODO: Вот дока: http://www.adobe.com/content/dam/Adobe/en/devnet/acrobat/pdfs/pdf_reference_1-7.pdf, стр. 67
-        # TODO: Самое сложное — JBIG2Decode, это достаточно новый формат с непростым кодированием
-        # TODO: Реализация на js: https://github.com/mozilla/pdf.js/blob/ca936ee0c7ac5baeca76a45dfc5485b3607de290/src/core/jbig2.js
-        # TODO: Хорошая реализация на C: http://www.artifex.com/jbig2dec/download/jbig2dec-0.13.tar.gz
-        # TODO: Реализация на .NET: https://github.com/devteamexpress/JBig2Decoder.NET
-        # TODO: После того, как будут реализованы все стандарты, из этого нужно будет сделать отдельную либу.
-        # TODO: В данный момент аналогов нет, будет новьё. И статью на habr о мучениях в процессе
-        cond_scan_reader = PyPDF2.PdfFileReader(pdf_file)
-        if pages_to_process is None:
-            pages_to_process = range(0, cond_scan_reader.getNumPages())
-        for i in pages_to_process:  # цикл по всем страницам
-            page = cond_scan_reader.getPage(i)  # Получаем текущую страницу
-            xObject = page['/Resources']['/XObject'].getObject()  # Извлекаем неё ресурсы
-            for obj in xObject:  # Перебираем все объеты, нам нужна картинка
-                if xObject[obj]['/Subtype'] == '/Image':
-                    # Получаем размер изображения
-                    width = xObject[obj]['/Width']
-                    height = xObject[obj]['/Height']
-                    size = (width, height)
-                    # Получаем данные изображения
-                    try:
-                        data = xObject[obj].getData()
-                    except NotImplementedError:
-                        data = xObject[obj]._data  # sorry, getData() does not work for CCITTFaxDecode
-                    img_size = len(data)
-                    # Определяем цветность
-                    if xObject[obj]['/ColorSpace'] == '/DeviceRGB':
-                        mode = "RGB"
-                    else:
-                        mode = "P"
-                    # В зависимости от способа кодирования получаем изображение:
-                    image_codec = xObject[obj]['/Filter']
-                    if image_codec == '/FlateDecode':  # png
-                        img = Image.frombytes(mode, size, data)
-                    elif image_codec == '/DCTDecode':  # jpg
-                        img = Image.open(io.BytesIO(data))
-                    elif image_codec == '/JPXDecode':  # jp2
-                        img = Image.open(io.BytesIO(data))
-                    elif image_codec == '/CCITTFaxDecode':  # CCITT4
-                        tiff_header = _tiff_header_for_CCITT(width, height, img_size)
-                        img = Image.open(io.BytesIO(tiff_header + data))
-                    elif image_codec == ['/FlateDecode', '/DCTDecode']:  # JPEG compression was applied first, and then it was Deflated
-                        img = Image.open(io.BytesIO(zlib.decompress(data)))
-                    yield img
+    logging.basicConfig(format = u'%(levelname)-8s [%(asctime)s] %(message)s', level = logging.INFO)
 
 
 def align_image(img):
@@ -143,11 +65,11 @@ def scan_image_generator(pdf_filename):
     Может брать данные из pdf или напрямую из сканированных картинок
     """
     BITMAP_BORDER = 150
-    for img in extract_images_from_pdf(pdf_filename):
+    for img in extract_images_from_files(pdf_filename):
         ar = np.array(img.convert("L"))  # Делаем ч/б
-        # TODO: С поворотом здесь какой-то треш. Это должно быть вынесено в extract_images_from_pdf
-        # if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
-        #     ar = ar.T[::-1, :]
+        # TODO: С поворотом здесь какой-то треш. Это должно быть вынесено в extract_images_from_files
+        if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
+            ar = ar.T[::-1, :]
         ar = align_image(ar)
         ar_bit = np.zeros_like(ar)
         ar_bit[ar > BITMAP_BORDER] = 255
@@ -163,7 +85,7 @@ def img_to_bitmap_np(img):
            [ 255.,  255.,  255.,  255.,  255.]])
     """
     ar = np.array(img.convert("L"))  # Делаем ч/б
-    # TODO: С поворотом здесь какой-то треш. Это должно быть вынесено в extract_images_from_pdf
+    # TODO: С поворотом здесь какой-то треш. Это должно быть вынесено в extract_images_from_files
     if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
         ar = ar.T[::-1, :]
     ar = align_image(ar)
@@ -181,7 +103,9 @@ def img_to_bitmap_np(img):
 
 
 def remove_dots_from_image(gray_np_image):
-    """Удаляет мелкий сор из изображения"""
+    """Удаляет мелкий сор из изображения
+    Удаляем все точки, у которых нет достаточно убедительных соседей
+    """
     clean1 = cv2.dilate(gray_np_image, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1)))
     clean2 = cv2.dilate(gray_np_image, cv2.getStructuringElement(cv2.MORPH_RECT, (1, 3)))
     clean3 = cv2.dilate(gray_np_image, cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2)))
@@ -317,22 +241,25 @@ def find_filled_cells(gray_np_image, hor, vert):
 
 
 def unmark_useless_cells(filled_cells):
+    """Может оказаться, что в таблице некоторые строки всегда заполнены. И нам не итересно, заполнены ли они.
+    Эта фукнция снимает с них отметки, например, для того, чтобы эти ячейки не подсвечивались как заполненные"""
     # Лично у нас первая и последняя строка, а также нулевой и второй столбец отмечать не нужно
     # TODO: здесь мутный хардкод под наши кондуиты. Это должно быть как-то переделано
-    filled_cells[filled_cells[:, 2] == False, :] = False
-    filled_cells[:, 0] = False
-    filled_cells[0, :] = False
-    filled_cells[-1, :] = False
+    # filled_cells[filled_cells[:, 2] == False, :] = False
+    # filled_cells[:, 0] = False
+    # filled_cells[0, :] = False
+    # filled_cells[-1, :] = False
     return filled_cells
 
 
 def remove_useless_cells(filled_cells):
+    """Часть ячеек нас совершенно не интересует. Удалим из итоговой выдачи"""
     # Лично у нас первая и последняя строка, а также первый столбец не нужны
     # Кроме того, вовсе удалим строки, в которых не заполнена фамилия.
     # TODO: здесь мутный хардкод под наши кондуиты. Это должно быть как-то переделано
-    filled_cells = filled_cells[1:-1, 1:]
-    filled_cells = filled_cells[filled_cells[:, 1] == True, :]
-    filled_cells = np.delete(filled_cells, 1, axis=1)  # Здесь столбец с фамилией
+    # filled_cells = filled_cells[1:-1, 1:]
+    # filled_cells = filled_cells[filled_cells[:, 1] == True, :]
+    # filled_cells = np.delete(filled_cells, 1, axis=1)  # Здесь столбец с фамилией
     logging.info('*'*100)
     logging.info(filled_cells.astype(int))
     logging.info('*'*100)
@@ -340,6 +267,8 @@ def remove_useless_cells(filled_cells):
 
 
 def mark_filled_cells(gray_np_image, filled_cells, hor, vert):
+    """Отмаркировать ячейки, которые распознались как заполненные
+    (заливка жёлтым с прозрачностью 0.3)"""
     clrd = cv2.cvtColor(gray_np_image, cv2.COLOR_GRAY2BGR)
     clrd_r = clrd.copy()
     for i in range(len(hor) - 1):
@@ -423,6 +352,6 @@ if __name__ == '__main__':
     pass
     # Исключительно для отладки:
     os.chdir(r'tests\test_imgs&pdfs')
-    images = extract_images_from_pdf(r'C:/Users/s22b_abishev.SCH179/Downloads/_сканы кондуитов 2015/MX-M260_20160126_000834.pdf')
+    images = extract_images_from_files('tst_01.pdf', pages_to_process=[0])
     recognized_pages = prc_all_images(images)
     GUI.show('sum_page_0.png')
