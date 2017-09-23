@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-.
-import struct
 import io
+import logging
 import os
+import struct
 import zlib
-import cv2  # pip install --upgrade opencv-python
-import numpy as np  # conda install numpy
-import PyPDF2  # pip install --upgrade pypdf2
-from PIL import Image  # pip install --upgrade pillow
 from multiprocessing import Pool
 from time import time
-import logging
 
+import PyPDF2  # pip install --upgrade pypdf2
+import cv2  # pip install --upgrade opencv-python
+import numpy as np  # conda install numpy
+from PIL import Image  # pip install --upgrade pillow
+import GUI
 
 np.set_printoptions(linewidth=200)
 
@@ -410,5 +411,4 @@ if __name__ == '__main__':
     os.chdir(r'tests\test_imgs&pdfs')
     images = extract_images_from_pdf('tst_01.pdf', pages_to_process=[0, 1])
     recognized_pages = prc_all_images(images)
-
-
+    GUI.show('sum_page_1.png')
