@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-.
-import io
 import logging
 import os
 import cv2  # pip install --upgrade opencv-python
@@ -7,18 +6,17 @@ import numpy as np  # conda install numpy
 from multiprocessing import Pool
 from time import time
 from image_iterator import extract_images_from_files
-import logging
+from plus_highlighting import feature_qt
 
-from PIL import Image  # pip install --upgrade pillow
-import GUI
 
 np.set_printoptions(linewidth=200)
 
 DEBUG = True
+LOGGING_FORMAT = '%(levelname)-8s [%(asctime)s] %(message)s'
 if DEBUG:
-    logging.basicConfig(format = u'%(levelname)-8s [%(asctime)s] %(message)s', level = logging.DEBUG)
+    logging.basicConfig(format=LOGGING_FORMAT, level=logging.DEBUG)
 else:
-    logging.basicConfig(format = u'%(levelname)-8s [%(asctime)s] %(message)s', level = logging.INFO)
+    logging.basicConfig(format=LOGGING_FORMAT, level=logging.INFO)
 
 
 def align_image(img):
@@ -266,20 +264,6 @@ def remove_useless_cells(filled_cells):
     return filled_cells
 
 
-def mark_filled_cells(gray_np_image, filled_cells, hor, vert):
-    """Отмаркировать ячейки, которые распознались как заполненные
-    (заливка жёлтым с прозрачностью 0.3)"""
-    clrd = cv2.cvtColor(gray_np_image, cv2.COLOR_GRAY2BGR)
-    clrd_r = clrd.copy()
-    for i in range(len(hor) - 1):
-        for j in range(len(vert) - 1):
-            if filled_cells[i][j]:
-                clrd_r[hor[i]:hor[i+1], vert[j]:vert[j+1], :] = [0, 255, 255]  # 0=Blue
-                # clrd_r[hor[i]:hor[i+1], vert[j]:vert[j+1], 1] = 255  # 1=Green
-                # clrd_r[hor[i]:hor[i+1], vert[j]:vert[j+1], 2] = 255  # 2=Red
-    return cv2.addWeighted(clrd, .7, clrd_r, .3, 0)
-
-
 def prc_one_prepared_image(gray_np_image, save_marked_name=None):
     """
     Распознаёт кондуит в ЧБ-изображении, переданном в виде numpy ndarray'я.
@@ -299,21 +283,15 @@ def prc_one_prepared_image(gray_np_image, save_marked_name=None):
     horizontal_coords, vertical_coords = calcutale_lines_coords(horizontal_lines, vertical_lines)
     plus = mark_plus(clean, horizontal_lines, vertical_lines)
     filled_cells = find_filled_cells(plus, horizontal_coords, vertical_coords)
-    if save_marked_name:
-        colored = mark_filled_cells(gray_np_image, unmark_useless_cells(filled_cells), horizontal_coords, vertical_coords)
-        cv2.imwrite(save_marked_name, colored)
+    filled_cells = unmark_useless_cells(filled_cells)
+    # TODO Благодаря GUI кусок с выводом отмеченных точек переезжает «на потом»
+    # if save_marked_name:
+    #     colored = mark_filled_cells(gray_np_image, filled_cells, horizontal_coords, vertical_coords)
+    #     cv2.imwrite(save_marked_name, colored)
     return filled_cells, horizontal_coords, vertical_coords
 
 
-def feature_qt(pil_image, gray_np_image, vertical_coords, horizontal_coords, filled_cells):
-
-
-
-    return filled_cells
-
 def prc_one_image(pil_image, pgnum=[0]):
-    # TODO delete it
-    global im, vert, hor, cel
     """Полностью обработать одну страницу (изображение в формате PIL)"""
     if isinstance(pgnum, list):
         # Используется хук для того, чтобы использовать уникальные номера
@@ -323,15 +301,10 @@ def prc_one_image(pil_image, pgnum=[0]):
         use_pgnum = pgnum
     gray_np_image = img_to_bitmap_np(pil_image)
     # TODO: пока безусловное сохранение в save_marked_name — это треш
-    filled_cells, horizontal_coords, vertical_coords = prc_one_prepared_image(gray_np_image, save_marked_name="sum_page_{}.png".format(pgnum))
-    print(horizontal_coords, vertical_coords)
+    filled_cells, horizontal_coords, vertical_coords = prc_one_prepared_image(gray_np_image, save_marked_name="sum_page_{}.png".format(use_pgnum))
+    filled_cells = feature_qt(gray_np_image, filled_cells, horizontal_coords, vertical_coords)
+    # Теперь удаляем кусок ячеек, которые вообще никому не интересны
     filled_cells = remove_useless_cells(filled_cells)
-    filled_cells = feature_qt(pil_image, gray_np_image, vertical_coords, horizontal_coords, filled_cells)
-    # TODO delete
-    im = gray_np_image
-    vert, hor = vertical_coords, horizontal_coords
-    cel = filled_cells
-    # res_list[pgnum] = filled_cells
     return filled_cells
 
 
@@ -352,6 +325,10 @@ if __name__ == '__main__':
     pass
     # Исключительно для отладки:
     os.chdir(r'tests\test_imgs&pdfs')
-    images = extract_images_from_files('tst_01.pdf', pages_to_process=[0])
-    recognized_pages = prc_all_images(images)
-    GUI.show('sum_page_0.png')
+    # images = extract_images_from_files('tst_01.pdf', pages_to_process=[0])
+    # recognized_pages = prc_all_images(images)
+    gray_np_image = cv2.cvtColor(cv2.imread('test_prepated_image_01.png'), cv2.COLOR_BGR2GRAY)
+    filled_cells, horizontal_coords, vertical_coords = prc_one_prepared_image(gray_np_image)
+    filled_cells = feature_qt(gray_np_image, filled_cells, horizontal_coords, vertical_coords)
+    print(filled_cells)
+
