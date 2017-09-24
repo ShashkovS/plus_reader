@@ -7,6 +7,7 @@ from multiprocessing import Pool
 from time import time
 from image_iterator import extract_images_from_files
 from plus_highlighting import feature_qt
+import pickle
 
 
 np.set_printoptions(linewidth=200)
@@ -327,8 +328,13 @@ if __name__ == '__main__':
     os.chdir(r'tests\test_imgs&pdfs')
     # images = extract_images_from_files('tst_01.pdf', pages_to_process=[0])
     # recognized_pages = prc_all_images(images)
-    gray_np_image = cv2.cvtColor(cv2.imread('test_prepated_image_01.png'), cv2.COLOR_BGR2GRAY)
-    filled_cells, horizontal_coords, vertical_coords = prc_one_prepared_image(gray_np_image)
+    # gray_np_image = cv2.cvtColor(cv2.imread('test_prepated_image_01.png'), cv2.COLOR_BGR2GRAY)
+    # filled_cells, horizontal_coords, vertical_coords = prc_one_prepared_image(gray_np_image)
+    # Запишем в дамп, чтобы запускалось быстрее
+    # with open(r'test_dump.pickle', 'wb') as f:
+    #     pickle.dump((gray_np_image, filled_cells, horizontal_coords, vertical_coords), f)
+    with open(r'test_dump.pickle', 'rb') as f:
+        (gray_np_image, filled_cells, horizontal_coords, vertical_coords) = pickle.load(f)
     filled_cells = feature_qt(gray_np_image, filled_cells, horizontal_coords, vertical_coords)
     print(filled_cells)
 

@@ -3,8 +3,14 @@ import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
 from PyQt5.QtGui import QPixmap, QPainter
 import cv2  # pip install --upgrade opencv-python
+import numpy as np
 from PIL import Image  # pip install --upgrade pillow
 from io import BytesIO
+
+FILL_COLOR = np.array([[[0, 255, 255]]], dtype=np.uint8)
+BORDER_COLOR = np.array([[[0, 0, 255]]], dtype=np.uint8)
+BORDER_WIDTH = 7
+
 
 class Label(QWidget):
     def __init__(self, parent=None):
@@ -44,24 +50,38 @@ def show(bin_image, im_height, im_width):
     sys.exit(app.exec_())
 
 
+def toggle_highlight_cell(i, j, image, filled_cells, horizontal_coords, vertical_coords, *, initial_mode=False):
+    FILL_COLOR = np.array([0, 255, 255], dtype=np.uint8)
+    ALPHA = .3
+    bw = BORDER_WIDTH // 2
+    h1, h2, v1, v2 = horizontal_coords[i]+bw, horizontal_coords[i + 1]-bw, vertical_coords[j]+bw, vertical_coords[j + 1]-bw
+    if filled_cells[i][j]:
+        image[h1:h2, v1:v2, :] = (1-ALPHA) * image[h1:h2, v1:v2, :] + ALPHA*FILL_COLOR  # GBR, so it's yellow
+    elif not initial_mode:
+        image[h1:h2, v1:v2, :] = (image[h1:h2, v1:v2, :] - ALPHA*FILL_COLOR) / (1-ALPHA)
+    if not initial_mode:
+        filled_cells[i][j] ^= filled_cells[i][j]
+
+
 def mark_filled_cells(gray_np_image, filled_cells, horizontal_coords, vertical_coords, show_borders=True):
     """Отмаркировать ячейки, которые распознались как заполненные
     (заливка жёлтым с прозрачностью 0.3)"""
-    clrd = cv2.cvtColor(gray_np_image, cv2.COLOR_GRAY2BGR)
-    clrd_r = clrd.copy()
+    colored = cv2.cvtColor(gray_np_image, cv2.COLOR_GRAY2BGR)
     # Каждую заполненную ячейку подкрашиваем жёлтым
     for i in range(len(horizontal_coords) - 1):
         for j in range(len(vertical_coords) - 1):
-            if filled_cells[i][j]:
-                clrd_r[horizontal_coords[i]:horizontal_coords[i + 1], vertical_coords[j]:vertical_coords[j + 1], :] = [0, 255, 255]  #
+            toggle_highlight_cell(i, j, colored, filled_cells, horizontal_coords, vertical_coords, initial_mode=True)
     # Добавляем распознанные границы красным:
     if show_borders:
-        L_W = 3
-        for h_b in horizontal_coords:
-            clrd_r[:, h_b - L_W:h_b + L_W:, :] = [255, 0, 0]
+        bw = BORDER_WIDTH // 2
         for v_b in vertical_coords:
-            clrd_r[v_b - L_W:v_b + L_W:, :, :] = [255, 0, 0]
-    return cv2.addWeighted(clrd, .7, clrd_r, .3, 0)
+            v1, v2 = v_b - bw, v_b + bw
+            colored[:, v1:v2, :] = .7*colored[:, v1:v2, :] + .3*BORDER_COLOR
+        for h_b in horizontal_coords:
+            h1, h2 = h_b - bw, h_b + bw
+            colored[h1:h2, :, :] = .7*colored[h1:h2, :, :] + .3*BORDER_COLOR
+    return colored
+
 
 
 def feature_qt(gray_np_image, filled_cells, horizontal_coords, vertical_coords):
