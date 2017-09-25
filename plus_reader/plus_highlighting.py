@@ -1,11 +1,9 @@
-import logging
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
-from PyQt5.QtGui import QPixmap, QPainter
+from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QCursor, QWheelEvent
+import PyQt5.QtCore as QtCore
 import cv2  # pip install --upgrade opencv-python
 import numpy as np
-from PIL import Image  # pip install --upgrade pillow
-from io import BytesIO
 
 FILL_COLOR = np.array([[[0, 255, 255]]], dtype=np.uint8)
 BORDER_COLOR = np.array([[[0, 0, 255]]], dtype=np.uint8)
@@ -73,9 +71,13 @@ class Label(QWidget):
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
             painter.drawPixmap(self.rect(), self.p)
 
+    def mousePressEvent(self, a0: QMouseEvent):
+        position = QCursor.pos()
+        print(position)
+
 
 class ScannedPageWidget(QWidget):
-    def __init__(self, bin_image, parent=None):
+    def __init__(self, bin_image, filled_cells, parent=None):
         QWidget.__init__(self, parent=parent)
         lay = QVBoxLayout(self)
         lb = Label(self)
@@ -84,14 +86,13 @@ class ScannedPageWidget(QWidget):
         lb.setPixmap(qp)
         lay.addWidget(lb)
 
-
-def show(image):
+def show(image, filled_cells):
     MAX_SIZE = 800
     mx = max(image.H, image.W)
     w_height, w_width = int(image.H/mx*MAX_SIZE), int(image.W/mx*MAX_SIZE),
 
     app = QApplication(sys.argv)
-    w = ScannedPageWidget(image.to_bin())
+    w = ScannedPageWidget(image.to_bin(), filled_cells)
     w.resize(w_height, w_width)
     w.show()
     sys.exit(app.exec_())
@@ -99,7 +100,7 @@ def show(image):
 
 def feature_qt(gray_np_image, filled_cells, horizontal_coords, vertical_coords):
     image = ImageProcessor(gray_np_image, filled_cells, horizontal_coords, vertical_coords)
-    show(image)
+    show(image, filled_cells)
     return filled_cells
 
 
