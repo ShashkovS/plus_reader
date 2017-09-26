@@ -30,8 +30,7 @@ class ImageProcessor():
         bw = self.BW
         h1, h2, v1, v2 = self.horizontal_coords[i]+bw, self.horizontal_coords[i + 1]-bw, \
                          self.vertical_coords[j]+bw, self.vertical_coords[j + 1]-bw
-        if (initial_mode and self.filled_cells[i][j])\
-                or not self.filled_cells[i][j]:
+        if not initial_mode ^ self.filled_cells[i][j]:  # initial_mode инвертирует логику
             self.image[h1:h2, v1:v2, :] = (1-ALPHA) * self.image[h1:h2, v1:v2, :] + ALPHA*FILL_COLOR  # GBR, so it's yellow
         elif not initial_mode and self.filled_cells[i][j]:
             self.image[h1:h2, v1:v2, :] = (self.image[h1:h2, v1:v2, :] - ALPHA*FILL_COLOR) / (1-ALPHA)
