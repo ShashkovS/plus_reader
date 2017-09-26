@@ -1,7 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
-from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QCursor, QWheelEvent
-import PyQt5.QtCore as QtCore
+from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QCursor
 import cv2  # pip install --upgrade opencv-python
 import numpy as np
 
@@ -51,6 +50,18 @@ class ImageProcessor():
                 h1, h2 = h_b - bw, h_b + bw
                 self.image[h1:h2, :, :] = .7 * self.image[h1:h2, :, :] + .3 * BORDER_COLOR
 
+    def coord_to_cell(self, x, y):
+        cell_coord = []
+        for i in range(len(self.horizontal_coords)):
+            if x <= self.horizontal_coords[i]:
+                cell_coord.append(i - 1)
+                break
+        for j in range(len(self.vertical_coords)):
+            if y <= self.vertical_coords[j]:
+                cell_coord.append(j - 1)
+                break
+        return cell_coord
+
     def to_bin(self):
         """Конвертнуть текущее состояние кортинки в бинарную строку для передачи в QT"""
         retval, bin_image = cv2.imencode('.png', self.image)
@@ -72,12 +83,17 @@ class Label(QWidget):
             painter.drawPixmap(self.rect(), self.p)
 
     def mousePressEvent(self, a0: QMouseEvent):
-        position = QCursor.pos()
-        print(position)
+        # TODO Починить
+        global image
+        cursor_pos_x = int(a0.x())
+        cursor_pos_y = int(a0.y())
+        cell_pos_x, cell_pos_y = image.coord_to_cell(cursor_pos_x, cursor_pos_y)
+        print(cursor_pos_x, cursor_pos_y, cell_pos_x, cell_pos_y, QCursor.pos())
+        image.toggle_highlight_cell(*image.coord_to_cell(cursor_pos_x, cursor_pos_y))
 
 
 class ScannedPageWidget(QWidget):
-    def __init__(self, bin_image, filled_cells, parent=None):
+    def __init__(self, bin_image, parent=None):
         QWidget.__init__(self, parent=parent)
         lay = QVBoxLayout(self)
         lb = Label(self)
@@ -86,21 +102,22 @@ class ScannedPageWidget(QWidget):
         lb.setPixmap(qp)
         lay.addWidget(lb)
 
-def show(image, filled_cells):
+def show(image):
     MAX_SIZE = 800
     mx = max(image.H, image.W)
     w_height, w_width = int(image.H/mx*MAX_SIZE), int(image.W/mx*MAX_SIZE),
-
     app = QApplication(sys.argv)
-    w = ScannedPageWidget(image.to_bin(), filled_cells)
+    w = ScannedPageWidget(image.to_bin())
     w.resize(w_height, w_width)
+    w.setFixedSize(w_height, w_width)
     w.show()
     sys.exit(app.exec_())
 
 
 def feature_qt(gray_np_image, filled_cells, horizontal_coords, vertical_coords):
+    global image
     image = ImageProcessor(gray_np_image, filled_cells, horizontal_coords, vertical_coords)
-    show(image, filled_cells)
+    show(image)
     return filled_cells
 
 
