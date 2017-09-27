@@ -1,12 +1,15 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
 from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QCursor
+from PyQt5.QtCore import QMargins
 import cv2  # pip install --upgrade opencv-python
 import numpy as np
+import logging
 
 FILL_COLOR = np.array([[[0, 255, 255]]], dtype=np.uint8)
 BORDER_COLOR = np.array([[[0, 0, 255]]], dtype=np.uint8)
 BORDER_WIDTH = 5
+MAX_SIZE = 800
 
 
 class ImageProcessor():
@@ -49,17 +52,19 @@ class ImageProcessor():
                 h1, h2 = h_b - bw, h_b + bw
                 self.image[h1:h2, :, :] = .7 * self.image[h1:h2, :, :] + .3 * BORDER_COLOR
 
-    def coord_to_cell(self, x, y):
+    def coord_to_cell(self, x, y, w, h):
         cell_coord = []
+        real_x_coord = x * self.W / w
+        real_y_coord = y * self.H / h
         for i in range(len(self.horizontal_coords)):
-            if x <= self.horizontal_coords[i]:
-                cell_coord.append(i - 1)
+            if real_x_coord > self.horizontal_coords[i]:
+                cell_coord.append((i - 1))
                 break
         for j in range(len(self.vertical_coords)):
-            if y <= self.vertical_coords[j]:
-                cell_coord.append(j - 1)
+            if real_y_coord > self.vertical_coords[j]:
+                cell_coord.append((j - 1))
                 break
-        return cell_coord
+        return cell_coord # map(lambda x: 0 if x <= 0 else x, cell_coord)
 
     def to_bin(self):
         """Конвертнуть текущее состояние кортинки в бинарную строку для передачи в QT"""
@@ -81,28 +86,28 @@ class Label(QWidget):
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
             painter.drawPixmap(self.rect(), self.p)
 
-    def mousePressEvent(self, a0: QMouseEvent):
-        # TODO Починить
-        global image
-        cursor_pos_x = int(a0.x())
-        cursor_pos_y = int(a0.y())
-        cell_pos_x, cell_pos_y = image.coord_to_cell(cursor_pos_x, cursor_pos_y)
-        print(cursor_pos_x, cursor_pos_y, cell_pos_x, cell_pos_y, QCursor.pos())
-        image.toggle_highlight_cell(*image.coord_to_cell(cursor_pos_x, cursor_pos_y))
-
 
 class ScannedPageWidget(QWidget):
     def __init__(self, bin_image, parent=None):
         QWidget.__init__(self, parent=parent)
         lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
         lb = Label(self)
         qp = QPixmap()
         qp.loadFromData(bin_image)
         lb.setPixmap(qp)
         lay.addWidget(lb)
 
+    def mousePressEvent(self, a0: QMouseEvent):
+        global image
+        cursor_pos_x = int(a0.x())
+        cursor_pos_y = int(a0.y())
+        logging.info(str(cursor_pos_x) + ' ' + str(cursor_pos_y))
+        cell_pos_x, cell_pos_y = image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.x(), self.y())
+        logging.info(str(cell_pos_y) + ' ' + str(cell_pos_x))
+        image.toggle_highlight_cell(cell_pos_x, cell_pos_y)
+
 def show(image):
-    MAX_SIZE = 800
     mx = max(image.H, image.W)
     w_height, w_width = int(image.H/mx*MAX_SIZE), int(image.W/mx*MAX_SIZE),
     app = QApplication(sys.argv)
