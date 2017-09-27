@@ -233,7 +233,7 @@ def find_filled_cells(gray_np_image, hor, vert):
     for i in range(rows):
         for j in range(colums):
             block = gray_np_image[hor[i]:hor[i+1], vert[j]:vert[j+1]]
-            logging.info('block shape = ' + str(block.shape))
+            # logging.info('block shape = ' + str(block.shape))
             part = 1 - (np.sum(block) / block.size / 255)
             filled[i][j] = (part >= MIN_FILLED_PART or
                             block[block < BLACK_DOT_THRESHOLD].size >= MIN_FILLED_DOTS)
@@ -329,13 +329,15 @@ if __name__ == '__main__':
     os.chdir(r'tests\test_imgs&pdfs')
     # images = extract_images_from_files('tst_01.pdf', pages_to_process=[0])
     # recognized_pages = prc_all_images(images)
-    gray_np_image = cv2.cvtColor(cv2.imread('test_prepated_image_01.png'), cv2.COLOR_BGR2GRAY)
-    filled_cells, horizontal_coords, vertical_coords = prc_one_prepared_image(gray_np_image)
+    # gray_np_image = cv2.cvtColor(cv2.imread('test_prepated_image_01.png'), cv2.COLOR_BGR2GRAY)
+    # filled_cells, horizontal_coords, vertical_coords = prc_one_prepared_image(gray_np_image)
     # Запишем в дамп, чтобы запускалось быстрее
     # with open(r'test_dump.pickle', 'wb') as f:
     #     pickle.dump((gray_np_image, filled_cells, horizontal_coords, vertical_coords), f)
-    # with open(r'test_dump.pickle', 'rb') as f:
-    #     (gray_np_image, filled_cells, horizontal_coords, vertical_coords) = pickle.load(f)
+    # exit()
+    with open(r'test_dump.pickle', 'rb') as f:
+        (gray_np_image, filled_cells, horizontal_coords, vertical_coords) = pickle.load(f)
+    horizontal_coords = horizontal_coords
     filled_cells = feature_qt(gray_np_image, filled_cells, horizontal_coords, vertical_coords)
     print(filled_cells)
 

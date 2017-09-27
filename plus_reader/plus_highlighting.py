@@ -2,6 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
 from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QCursor
 from PyQt5.QtCore import QMargins
+from bisect import bisect_left
 import cv2  # pip install --upgrade opencv-python
 import numpy as np
 import logging
@@ -35,7 +36,7 @@ class ImageProcessor():
         elif not initial_mode and self.filled_cells[i][j]:
             self.image[h1:h2, v1:v2, :] = (self.image[h1:h2, v1:v2, :] - ALPHA*FILL_COLOR) / (1-ALPHA)
         if not initial_mode:
-            self.filled_cells[i][j] ^= self.filled_cells[i][j]
+            self.filled_cells[i][j] ^= True
 
     def initial_mark_filled_cells(self):
         """Выполнить первичную маркировку всех заполненных ячеек"""
@@ -53,18 +54,14 @@ class ImageProcessor():
                 self.image[h1:h2, :, :] = .7 * self.image[h1:h2, :, :] + .3 * BORDER_COLOR
 
     def coord_to_cell(self, x, y, w, h):
-        cell_coord = []
         real_x_coord = x * self.W / w
         real_y_coord = y * self.H / h
-        for i in range(len(self.horizontal_coords)):
-            if real_x_coord > self.horizontal_coords[i]:
-                cell_coord.append((i - 1))
-                break
-        for j in range(len(self.vertical_coords)):
-            if real_y_coord > self.vertical_coords[j]:
-                cell_coord.append((j - 1))
-                break
-        return cell_coord # map(lambda x: 0 if x <= 0 else x, cell_coord)
+        x_ind = bisect_left(self.vertical_coords, real_x_coord) - 1
+        y_ind = bisect_left(self.horizontal_coords, real_y_coord) - 1
+        if x_ind < 0 or y_ind < 0 or x_ind >= len(self.vertical_coords) or y_ind >= len(self.horizontal_coords):
+            return None
+        else:
+            return [x_ind, y_ind]
 
     def to_bin(self):
         """Конвертнуть текущее состояние кортинки в бинарную строку для передачи в QT"""
@@ -90,30 +87,33 @@ class Label(QWidget):
 class ScannedPageWidget(QWidget):
     def __init__(self, bin_image, parent=None):
         QWidget.__init__(self, parent=parent)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lb = Label(self)
-        qp = QPixmap()
-        qp.loadFromData(bin_image)
-        lb.setPixmap(qp)
-        lay.addWidget(lb)
+        self.bin_image = bin_image
+        self.lay = QVBoxLayout(self)
+        self.lay.setContentsMargins(0, 0, 0, 0)
+        self.lb = Label(self)
+        self.qp = QPixmap()
+        self.qp.loadFromData(bin_image)
+        self.lb.setPixmap(self.qp)
+        self.lay.addWidget(self.lb)
 
     def mousePressEvent(self, a0: QMouseEvent):
         global image
         cursor_pos_x = int(a0.x())
         cursor_pos_y = int(a0.y())
         logging.info(str(cursor_pos_x) + ' ' + str(cursor_pos_y))
-        cell_pos_x, cell_pos_y = image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.x(), self.y())
-        logging.info(str(cell_pos_y) + ' ' + str(cell_pos_x))
-        image.toggle_highlight_cell(cell_pos_x, cell_pos_y)
+        cell_pos = image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.width(), self.height())
+        logging.info(str(cell_pos))
+        if cell_pos:
+            image.toggle_highlight_cell(*cell_pos)
+        self.update()
 
 def show(image):
     mx = max(image.H, image.W)
     w_height, w_width = int(image.H/mx*MAX_SIZE), int(image.W/mx*MAX_SIZE),
     app = QApplication(sys.argv)
     w = ScannedPageWidget(image.to_bin())
-    w.resize(w_height, w_width)
-    w.setFixedSize(w_height, w_width)
+    w.resize(w_width, w_height)
+    w.setFixedSize(w_width, w_height)
     w.show()
     sys.exit(app.exec_())
 
