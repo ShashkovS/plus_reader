@@ -102,32 +102,33 @@ class Label(QWidget):
 
 
 class ScannedPageWidget(QWidget):
-    def __init__(self, bin_image, parent=None):
+    def __init__(self, image, parent=None):
         QWidget.__init__(self, parent=parent)
-        self.bin_image = bin_image
+        self.image = image
         self.lay = QVBoxLayout(self)
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lb = Label(self)
         self.qp = QPixmap()
-        self.qp.loadFromData(bin_image)
+        self.qp.loadFromData(self.image.to_bin())
         self.lb.setPixmap(self.qp)
         self.lay.addWidget(self.lb)
 
     def mousePressEvent(self, a0: QMouseEvent):
-        global image
         cursor_pos_x = int(a0.x())
         cursor_pos_y = int(a0.y())
         logging.info(str(cursor_pos_x) + ' ' + str(cursor_pos_y))
-        cell_pos = image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.width(), self.height())
+        cell_pos = self.image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.width(), self.height())
         if cell_pos:
-            image.toggle_highlight_cell(*cell_pos)
-        self.update()
+            self.image.toggle_highlight_cell(*cell_pos)
+        self.qp.loadFromData(self.image.to_bin())
+        self.lb.setPixmap(self.qp)
+        self.lb.update()
 
 def show(image):
     mx = max(image.H, image.W)
     w_height, w_width = int(image.H/mx*MAX_SIZE), int(image.W/mx*MAX_SIZE),
     app = QApplication(sys.argv)
-    w = ScannedPageWidget(image.to_bin())
+    w = ScannedPageWidget(image)
     w.resize(w_width, w_height)
     w.setFixedSize(w_width, w_height)
     w.show()
