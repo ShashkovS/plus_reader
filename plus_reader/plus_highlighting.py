@@ -132,7 +132,7 @@ def show(image):
     w.resize(w_width, w_height)
     w.setFixedSize(w_width, w_height)
     w.show()
-    sys.exit(app.exec_())
+    app.exec_()
 
 
 def feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns):
