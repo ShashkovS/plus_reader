@@ -3,12 +3,13 @@ import logging
 import os
 import cv2  # pip install --upgrade opencv-python
 import numpy as np  # conda install numpy
+import importlib
+import pickle
 from multiprocessing import Pool
 from time import time
 from image_iterator import extract_images_from_files
-from plus_highlighting import feature_qt
-import pickle
-
+if importlib.util.find_spec('PyQt5'):
+    from plus_highlighting import feature_qt
 
 np.set_printoptions(linewidth=200)
 
@@ -83,11 +84,10 @@ def img_to_bitmap_np(img):
            [ 255.,    0.,    0.,    0.,  255.],
            [ 255.,  255.,  255.,  255.,  255.]])
     """
-    ar = np.array(img.convert("L"))  # Делаем ч/б
     # TODO: С поворотом здесь какой-то треш. Это должно быть вынесено в extract_images_from_files
-    if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
-        ar = ar.T[::-1, :]
-    ar = align_image(ar)
+    # if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
+    #     ar = ar.T[::-1, :]
+    ar = align_image(img)
 
     # BITMAP_BORDER = 233
     # ar_bit = np.zeros_like(ar)
@@ -285,7 +285,6 @@ def prc_one_prepared_image(gray_np_image, save_marked_name=None):
     coords_of_horiz_lns, coords_of_vert_lns = calcutale_lines_coords(horizontal_lines, vertical_lines)
     plus = mark_plus(clean, horizontal_lines, vertical_lines)
     filled_cells = find_filled_cells(plus, coords_of_horiz_lns, coords_of_vert_lns)
-    filled_cells = unmark_useless_cells(filled_cells)
     # TODO Благодаря GUI кусок с выводом отмеченных точек переезжает «на потом»
     # if save_marked_name:
     #     colored = mark_filled_cells(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
@@ -293,30 +292,33 @@ def prc_one_prepared_image(gray_np_image, save_marked_name=None):
     return filled_cells, coords_of_horiz_lns, coords_of_vert_lns
 
 
-def prc_one_image(pil_image, pgnum=[0]):
-    """Полностью обработать одну страницу (изображение в формате PIL)"""
+def prc_one_image(np_image, pgnum=[0]):
+    """Полностью обработать одну страницу (изображение в формате numpy)"""
     if isinstance(pgnum, list):
         # Используется хук для того, чтобы использовать уникальные номера
         use_pgnum = pgnum[0]
         pgnum[0] += 1
     else:
         use_pgnum = pgnum
-    gray_np_image = img_to_bitmap_np(pil_image)
+    gray_np_image = img_to_bitmap_np(np_image)
     # TODO: пока безусловное сохранение в save_marked_name — это треш
     filled_cells, coords_of_horiz_lns, coords_of_vert_lns = prc_one_prepared_image(gray_np_image, save_marked_name="sum_page_{}.png".format(use_pgnum))
-    filled_cells = feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
+    filled_cells = unmark_useless_cells(filled_cells)
+    # If PyQt5 installed, than show
+    if importlib.util.find_spec('PyQt5'):
+        filled_cells = feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
     # Теперь удаляем кусок ячеек, которые вообще никому не интересны
     filled_cells = remove_useless_cells(filled_cells)
     return filled_cells
 
 
-def prc_all_images(iterable_of_pil_images, njobs=1):
+def prc_all_images(iterable_of_np_images, njobs=1):
     stt = time()
     if njobs == 1:
-        recognized_pages = [prc_one_image(image, pg_num) for pg_num, image in enumerate(iterable_of_pil_images)]
+        recognized_pages = [prc_one_image(image, pg_num) for pg_num, image in enumerate(iterable_of_np_images)]
     else:
         prc_pool = Pool(njobs)
-        recognized_pages = prc_pool.map(prc_one_image, iterable_of_pil_images)
+        recognized_pages = prc_pool.map(prc_one_image, iterable_of_np_images)
     ent = time()
     if DEBUG:
         logging.info('Done in ' + str(ent - stt))
@@ -327,17 +329,16 @@ if __name__ == '__main__':
     pass
     # Исключительно для отладки:
     os.chdir(r'tests\test_imgs&pdfs')
-    # images = extract_images_from_files('tst_01.pdf', pages_to_process=[0])
-    # recognized_pages = prc_all_images(images)
+    images = extract_images_from_files('tst_01.pdf', pages_to_process=[0, 1])
+    recognized_pages = prc_all_images(images, njobs=2)
     # gray_np_image = cv2.cvtColor(cv2.imread('test_prepated_image_01.png'), cv2.COLOR_BGR2GRAY)
     # filled_cells, coords_of_horiz_lns, coords_of_vert_lns = prc_one_prepared_image(gray_np_image)
     # Запишем в дамп, чтобы запускалось быстрее
     # with open(r'test_dump.pickle', 'wb') as f:
     #     pickle.dump((gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns), f)
     # exit()
-    with open(r'test_dump.pickle', 'rb') as f:
-        (gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns) = pickle.load(f)
-    coords_of_horiz_lns = coords_of_horiz_lns
-    filled_cells = feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
-    print(filled_cells)
-
+    # with open(r'test_dump.pickle', 'rb') as f:
+    #     (gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns) = pickle.load(f)
+    # coords_of_horiz_lns = coords_of_horiz_lns
+    # filled_cells = feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
+    # print(filled_cells)

@@ -4,6 +4,7 @@ import io
 import zlib
 import os
 import PyPDF2  # pip install --upgrade pypdf2
+import numpy as np
 from PIL import Image  # pip install --upgrade pillow
 
 
@@ -88,13 +89,14 @@ def yield_images_from_pdf(pdf_filename, pages_to_process=None):
                 else:
                     # TODO: тогда можно попробовать сконвертировать изображение в png при помощи imagemagic, если он есть в системе
                     raise ValueError('Unknown codec in pdf: ' + image_codec)
-                yield img
+                npimg = np.array(img.convert("L"))
+                yield npimg
 
 
 def extract_images_from_files(filenames, pages_to_process=None):
     """Генератор, извлекающий все изображения из pdf-файла или картинки.
     Либо из списка pdf-файлов и картинок.
-    Возвращающий итератор на извлечённые изображения в формате Pillow Image
+    Возвращающий итератор на извлечённые изображения в формате numpy.array
     """
     if isinstance(filenames, str):
         files_to_process = [filenames]
