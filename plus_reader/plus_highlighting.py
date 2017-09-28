@@ -130,7 +130,7 @@ def show(image):
     app = QApplication(sys.argv)
     w = ScannedPageWidget(image)
     w.resize(w_width, w_height)
-    w.setFixedSize(w_width, w_height)
+    # w.setFixedSize(w_width, w_height)
     w.show()
     app.exec_()
 
