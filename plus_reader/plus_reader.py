@@ -282,15 +282,15 @@ def prc_one_prepared_image(gray_np_image, save_marked_name=None):
     horizontal_lines = find_lines_on_image(gray_np_image, 'horizontal')
     vertical_lines = find_lines_on_image(gray_np_image, 'vertical')
     # Вычисляем координаты узлов сетки
-    horizontal_coords, vertical_coords = calcutale_lines_coords(horizontal_lines, vertical_lines)
+    coords_of_horiz_lns, coords_of_vert_lns = calcutale_lines_coords(horizontal_lines, vertical_lines)
     plus = mark_plus(clean, horizontal_lines, vertical_lines)
-    filled_cells = find_filled_cells(plus, horizontal_coords, vertical_coords)
+    filled_cells = find_filled_cells(plus, coords_of_horiz_lns, coords_of_vert_lns)
     filled_cells = unmark_useless_cells(filled_cells)
     # TODO Благодаря GUI кусок с выводом отмеченных точек переезжает «на потом»
     # if save_marked_name:
-    #     colored = mark_filled_cells(gray_np_image, filled_cells, horizontal_coords, vertical_coords)
+    #     colored = mark_filled_cells(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
     #     cv2.imwrite(save_marked_name, colored)
-    return filled_cells, horizontal_coords, vertical_coords
+    return filled_cells, coords_of_horiz_lns, coords_of_vert_lns
 
 
 def prc_one_image(pil_image, pgnum=[0]):
@@ -303,8 +303,8 @@ def prc_one_image(pil_image, pgnum=[0]):
         use_pgnum = pgnum
     gray_np_image = img_to_bitmap_np(pil_image)
     # TODO: пока безусловное сохранение в save_marked_name — это треш
-    filled_cells, horizontal_coords, vertical_coords = prc_one_prepared_image(gray_np_image, save_marked_name="sum_page_{}.png".format(use_pgnum))
-    filled_cells = feature_qt(gray_np_image, filled_cells, horizontal_coords, vertical_coords)
+    filled_cells, coords_of_horiz_lns, coords_of_vert_lns = prc_one_prepared_image(gray_np_image, save_marked_name="sum_page_{}.png".format(use_pgnum))
+    filled_cells = feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
     # Теперь удаляем кусок ячеек, которые вообще никому не интересны
     filled_cells = remove_useless_cells(filled_cells)
     return filled_cells
@@ -330,14 +330,14 @@ if __name__ == '__main__':
     # images = extract_images_from_files('tst_01.pdf', pages_to_process=[0])
     # recognized_pages = prc_all_images(images)
     # gray_np_image = cv2.cvtColor(cv2.imread('test_prepated_image_01.png'), cv2.COLOR_BGR2GRAY)
-    # filled_cells, horizontal_coords, vertical_coords = prc_one_prepared_image(gray_np_image)
+    # filled_cells, coords_of_horiz_lns, coords_of_vert_lns = prc_one_prepared_image(gray_np_image)
     # Запишем в дамп, чтобы запускалось быстрее
     # with open(r'test_dump.pickle', 'wb') as f:
-    #     pickle.dump((gray_np_image, filled_cells, horizontal_coords, vertical_coords), f)
+    #     pickle.dump((gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns), f)
     # exit()
     with open(r'test_dump.pickle', 'rb') as f:
-        (gray_np_image, filled_cells, horizontal_coords, vertical_coords) = pickle.load(f)
-    horizontal_coords = horizontal_coords
-    filled_cells = feature_qt(gray_np_image, filled_cells, horizontal_coords, vertical_coords)
+        (gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns) = pickle.load(f)
+    coords_of_horiz_lns = coords_of_horiz_lns
+    filled_cells = feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
     print(filled_cells)
 
