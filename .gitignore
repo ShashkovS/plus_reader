@@ -2,5 +2,4 @@ build/
 dist/
 plus_reader.egg-info/
 /**/__pycache__/
-_*.png
 /**/.idea/

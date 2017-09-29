@@ -331,31 +331,33 @@ def prc_list_of_files(files, *, njobs=1, unmark_useless_cells_func=None, remove_
     global unmark_useless_cells, remove_useless_cells
     unmark_useless_cells = unmark_useless_cells_func
     remove_useless_cells = remove_useless_cells_func
-    images = extract_images_from_files(files, pages_to_process=[0, 1])
+    images = extract_images_from_files(files)
     np_images = (np.array(img.convert("L")) for img in images)
-    recognized_pages = prc_all_images(np_images, njobs=2)
+    recognized_pages = prc_all_images(np_images, njobs=njobs)
     return recognized_pages
 
 
 if __name__ == '__main__':
     pass
     # Исключительно для отладки:
-    recognized_pages = prc_list_of_files(r'tests\test_imgs&pdfs\tst_01.pdf', njobs=2)
-    print(recognized_pages)
+    # recognized_pages = prc_list_of_files(r'tests\test_imgs&pdfs\tst_01.pdf', njobs=2)
+    # recognized_pages = prc_list_of_files(r'tests\test_imgs&pdfs\bad_scan.png', njobs=1)
+    # print(recognized_pages)
 
 
-    # os.chdir(r'tests\test_imgs&pdfs')
+    os.chdir(r'tests\test_imgs&pdfs')
     # images = extract_images_from_files('tst_01.pdf', pages_to_process=[0, 1])
     # np_images = (np.array(img.convert("L")) for img in images)
     # recognized_pages = prc_all_images(np_images, njobs=2)
     # gray_np_image = cv2.cvtColor(cv2.imread('test_prepated_image_01.png'), cv2.COLOR_BGR2GRAY)
+    # gray_np_image = cv2.cvtColor(cv2.imread('bad_scan.png'), cv2.COLOR_BGR2GRAY)
     # filled_cells, coords_of_horiz_lns, coords_of_vert_lns = prc_one_prepared_image(gray_np_image)
-    # Запишем в дамп, чтобы запускалось быстрее
-    # with open(r'test_dump.pickle', 'wb') as f:
+    # # Запишем в дамп, чтобы запускалось быстрее
+    # with open(r'test_dump_2.pickle', 'wb') as f:
     #     pickle.dump((gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns), f)
     # exit()
-    # with open(r'test_dump.pickle', 'rb') as f:
-    #     (gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns) = pickle.load(f)
-    # coords_of_horiz_lns = coords_of_horiz_lns
-    # filled_cells = feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
-    # print(filled_cells)
+    with open(r'test_dump_2.pickle', 'rb') as f:
+        (gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns) = pickle.load(f)
+    coords_of_horiz_lns = coords_of_horiz_lns
+    filled_cells = feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
+    print(filled_cells)
