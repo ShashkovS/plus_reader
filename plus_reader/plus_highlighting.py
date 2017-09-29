@@ -1,7 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
-from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QCursor
-from PyQt5.QtCore import QMargins
+from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QWheelEvent
 from bisect import bisect_left
 import cv2  # pip install --upgrade opencv-python
 import numpy as np
@@ -100,6 +99,21 @@ class Label(QWidget):
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
             painter.drawPixmap(self.rect(), self.p)
 
+    def mousePressEvent(self, a0: QMouseEvent):
+        page = self.parentWidget()
+        cursor_pos_x = int(a0.x())
+        cursor_pos_y = int(a0.y())
+        logging.info(str(cursor_pos_x) + ' ' + str(cursor_pos_y))
+        cell_pos = page.image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.width(), self.height())
+        if cell_pos:
+            page.image.toggle_highlight_cell(*cell_pos)
+        page.qp.loadFromData(page.image.to_bin())
+        page.lb.setPixmap(page.qp)
+        page.lb.update()
+
+    def wheelEvent(self, a0: QWheelEvent):
+        logging.info(str(a0.angleDelta()))
+
 
 class ScannedPageWidget(QWidget):
     def __init__(self, image, parent=None):
@@ -112,17 +126,6 @@ class ScannedPageWidget(QWidget):
         self.qp.loadFromData(self.image.to_bin())
         self.lb.setPixmap(self.qp)
         self.lay.addWidget(self.lb)
-
-    def mousePressEvent(self, a0: QMouseEvent):
-        cursor_pos_x = int(a0.x())
-        cursor_pos_y = int(a0.y())
-        logging.info(str(cursor_pos_x) + ' ' + str(cursor_pos_y))
-        cell_pos = self.image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.width(), self.height())
-        if cell_pos:
-            self.image.toggle_highlight_cell(*cell_pos)
-        self.qp.loadFromData(self.image.to_bin())
-        self.lb.setPixmap(self.qp)
-        self.lb.update()
 
 def show(image):
     mx = max(image.H, image.W)
