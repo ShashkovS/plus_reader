@@ -55,25 +55,9 @@ def align_image(img):
     return dst
 
 
-def scan_image_generator(pdf_filename):
-    """Генератор, возвращающий последовательность изображений для распознавания.
-    в формате numpy ndarrray в черно-белом формате.
-    Например, в виде (здесь 255 --- это белый, 0 --- чёрный)
-    array([[ 255.,  255.,  255.,  255.,  255.],
-           [ 255.,    0.,    0.,    0.,  255.],
-           [ 255.,  255.,  255.,  255.,  255.]])
-    Может брать данные из pdf или напрямую из сканированных картинок
-    """
-    BITMAP_BORDER = 150
-    for img in extract_images_from_files(pdf_filename):
-        ar = np.array(img.convert("L"))  # Делаем ч/б
-        # TODO: С поворотом здесь какой-то треш. Это должно быть вынесено в extract_images_from_files
-        if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
-            ar = ar.T[::-1, :]
-        ar = align_image(ar)
-        ar_bit = np.zeros_like(ar)
-        ar_bit[ar > BITMAP_BORDER] = 255
-        yield ar_bit
+def blur_image(img):
+    blur = cv2.GaussianBlur(img, (7, 7), 0)
+    return blur
 
 
 def img_to_bitmap_np(img):
@@ -87,17 +71,14 @@ def img_to_bitmap_np(img):
     # TODO: С поворотом здесь какой-то треш. Это должно быть вынесено в extract_images_from_files
     # if ar.shape[1] > ar.shape[0]:  # Почему-то изображение повёрнуто
     #     ar = ar.T[::-1, :]
-    ar = align_image(img)
 
     # BITMAP_BORDER = 233
     # ar_bit = np.zeros_like(ar)
     # ar_bit[ar > BITMAP_BORDER] = 255
-
-    blur = cv2.GaussianBlur(ar, (5, 5), 0)
-    ret, ar_bit = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    ret = (max(ret, 210) + 250) // 2
-    ret, ar_bit = cv2.threshold(blur, ret, 255, cv2.THRESH_BINARY)
-
+    # ret, ar_bit = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # ret = (max(ret, 190) + 230) // 2
+    ret = BLACK_THRESHOLD
+    ret, ar_bit = cv2.threshold(img, ret, 255, cv2.THRESH_BINARY)
     return ar_bit
 
 
@@ -112,6 +93,15 @@ def remove_dots_from_image(gray_np_image):
     clean = cv2.erode(clean, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
     if DEBUG: cv2.imwrite("_clean.png", clean)
     return clean
+
+
+def remove_background(gray_np_image):
+    """Удаляет мелкий сор из изображения"""
+    med = cv2.medianBlur(gray_np_image, 75)
+    dif = cv2.add(gray_np_image, 255-med)
+    if VERBOSE:
+        cv2.imwrite("_med.png", med)
+    return dif
 
 
 def find_lines_on_image(gray_np_image, direction):
@@ -158,17 +148,19 @@ def mark_plus(gray_np_image, horizontal_lines, vertical_lines):
     """Принимает на вход картинку и маску таблицы.
     Размалёвывает плюсы
     """
-    BLACK_LINE_THRESHOLD = 50
-    table_mask = horizontal_lines & vertical_lines  # Горизонтальные и вертикальные линии вместе
+    BLACK_LINE_THRESHOLD = 175
+    table_mask = cv2.min(horizontal_lines, vertical_lines)  # Горизонтальные и вертикальные линии вместе
     table_mask[table_mask>BLACK_LINE_THRESHOLD] = 255
     table_mask[table_mask<=BLACK_LINE_THRESHOLD] = 0
     plus = (gray_np_image | ~table_mask)  # Убрали из изображения сами линии
+    # plus = img_to_bitmap_np(plus)
+    # plus = remove_dots_from_image(plus)
     # Замажем чёрным всё, в окрестности чего много точек.
     # Почти все плюсы превратятся в "жирные" кляксы
     # TODO: Здесь мутные константы, которые я подбирал руками для наших кондуитов. Это — треш
     plus = ~cv2.adaptiveThreshold(plus, 210, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 27, -9)
     # Вернём наместро сами плюсы
-    plus = np.minimum(plus, gray_np_image)
+    plus = cv2.min(plus, gray_np_image)
     # Очистим точки в границах таблицы, чтобы не мешались
     plus |= ~table_mask
     if DEBUG: cv2.imwrite("_plus.png", plus); cv2.imwrite("_table_mask.png", table_mask);
@@ -225,9 +217,9 @@ def find_filled_cells(gray_np_image, hor, vert):
     """Самая главная функция — определяет, заполнена ли ячейка
     """
     # TODO: убрать магические константы
-    MIN_FILLED_PART = 0.10
+    MIN_FILLED_PART = 0.030
     MIN_FILLED_DOTS = gray_np_image.size / 9000
-    BLACK_DOT_THRESHOLD = 80
+    BLACK_DOT_THRESHOLD = 225
     rows, colums = len(hor) - 1, len(vert) - 1
     filled = np.zeros((rows, colums), np.bool)
     for i in range(rows):
@@ -240,58 +232,6 @@ def find_filled_cells(gray_np_image, hor, vert):
     return filled
 
 
-def unmark_useless_cells(filled_cells):
-    """Может оказаться, что в таблице некоторые строки всегда заполнены. И нам не итересно, заполнены ли они.
-    Эта фукнция снимает с них отметки, например, для того, чтобы эти ячейки не подсвечивались как заполненные"""
-    # Лично у нас первая и последняя строка, а также нулевой и второй столбец отмечать не нужно
-    # TODO: здесь мутный хардкод под наши кондуиты. Это должно быть как-то переделано
-    # filled_cells[filled_cells[:, 2] == False, :] = False
-    # filled_cells[:, 0] = False
-    # filled_cells[0, :] = False
-    # filled_cells[-1, :] = False
-    return filled_cells
-
-
-def remove_useless_cells(filled_cells):
-    """Часть ячеек нас совершенно не интересует. Удалим из итоговой выдачи"""
-    # Лично у нас первая и последняя строка, а также первый столбец не нужны
-    # Кроме того, вовсе удалим строки, в которых не заполнена фамилия.
-    # TODO: здесь мутный хардкод под наши кондуиты. Это должно быть как-то переделано
-    # filled_cells = filled_cells[1:-1, 1:]
-    # filled_cells = filled_cells[filled_cells[:, 1] == True, :]
-    # filled_cells = np.delete(filled_cells, 1, axis=1)  # Здесь столбец с фамилией
-    logging.info('*'*100)
-    logging.info(filled_cells.astype(int))
-    logging.info('*'*100)
-    return filled_cells
-
-
-def prc_one_prepared_image(gray_np_image, save_marked_name=None):
-    """
-    Распознаёт кондуит в ЧБ-изображении, переданном в виде numpy ndarray'я.
-    Возвращает список списков [номер листа, номер строки, None, список результатов], например,
-    [2, 19, None, [1, 0, 0, 1, 1, 1, 0, 0, 0]].
-    Кроме того, возвращает цветное изображение, на котором жёлтым выделены ячейки,
-    распознанные как плюс. Изображение в формате трёхцветного numpy ndarray'я
-    (первая координата - номер строки, вторая - столбца, третья - цвет, blue=0, green=1, red=2
-    """
-    # Удаляем мусор
-    clean = gray_np_image
-    # clean = remove_dots_from_image(gray_np_image)
-    # Находим горизонтальные и вертикальные линии
-    horizontal_lines = find_lines_on_image(gray_np_image, 'horizontal')
-    vertical_lines = find_lines_on_image(gray_np_image, 'vertical')
-    # Вычисляем координаты узлов сетки
-    coords_of_horiz_lns, coords_of_vert_lns = calcutale_lines_coords(horizontal_lines, vertical_lines)
-    plus = mark_plus(clean, horizontal_lines, vertical_lines)
-    filled_cells = find_filled_cells(plus, coords_of_horiz_lns, coords_of_vert_lns)
-    # TODO Благодаря GUI кусок с выводом отмеченных точек переезжает «на потом»
-    # if save_marked_name:
-    #     colored = mark_filled_cells(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
-    #     cv2.imwrite(save_marked_name, colored)
-    return filled_cells, coords_of_horiz_lns, coords_of_vert_lns
-
-
 def prc_one_image(np_image, pgnum=[0]):
     """Полностью обработать одну страницу (изображение в формате numpy)"""
     if isinstance(pgnum, list):
@@ -300,14 +240,28 @@ def prc_one_image(np_image, pgnum=[0]):
         pgnum[0] += 1
     else:
         use_pgnum = pgnum
-    gray_np_image = img_to_bitmap_np(np_image)
+    gray_np_image = align_image(np_image)
+    gray_np_image = blur_image(gray_np_image)
+    # Удаляем мусор
+    gray_np_image = remove_background(gray_np_image)
+    gray_np_image[gray_np_image<100] = 0
+    gray_np_image = img_to_bitmap_np(gray_np_image)
+    gray_np_image = remove_dots_from_image(gray_np_image)
+
     # TODO: пока безусловное сохранение в save_marked_name — это треш
-    filled_cells, coords_of_horiz_lns, coords_of_vert_lns = prc_one_prepared_image(gray_np_image, save_marked_name="sum_page_{}.png".format(use_pgnum))
+    horizontal_lines = find_lines_on_image(gray_np_image, 'horizontal')
+    vertical_lines = find_lines_on_image(gray_np_image, 'vertical')
+    # Вычисляем координаты узлов сетки
+    coords_of_horiz_lns, coords_of_vert_lns = calcutale_lines_coords(horizontal_lines, vertical_lines)
+    bitmap_np_image = gray_np_image
+    plus = mark_plus(bitmap_np_image, horizontal_lines, vertical_lines)
+    filled_cells = find_filled_cells(plus, coords_of_horiz_lns, coords_of_vert_lns)
+
     if unmark_useless_cells:
         filled_cells = unmark_useless_cells(filled_cells)
     # If PyQt5 installed, than show
     if importlib.util.find_spec('PyQt5'):
-        filled_cells = feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
+        filled_cells = feature_qt(np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
     # Теперь удаляем кусок ячеек, которые вообще никому не интересны
     if remove_useless_cells:
         filled_cells = remove_useless_cells(filled_cells)
@@ -327,14 +281,16 @@ def prc_all_images(iterable_of_np_images, njobs=1):
     return recognized_pages
 
 
-def prc_list_of_files(files, *, njobs=1, unmark_useless_cells_func=None, remove_useless_cells_func=None):
-    global unmark_useless_cells, remove_useless_cells
+def prc_list_of_files(files, *, njobs=1, black_threshold=210, unmark_useless_cells_func=None, remove_useless_cells_func=None):
+    global unmark_useless_cells, remove_useless_cells, BLACK_THRESHOLD
     unmark_useless_cells = unmark_useless_cells_func
     remove_useless_cells = remove_useless_cells_func
+    BLACK_THRESHOLD = black_threshold
     images = extract_images_from_files(files)
     np_images = (np.array(img.convert("L")) for img in images)
     recognized_pages = prc_all_images(np_images, njobs=njobs)
     return recognized_pages
+
 
 
 if __name__ == '__main__':
