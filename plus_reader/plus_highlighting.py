@@ -1,7 +1,6 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
-from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QCursor
-from PyQt5.QtCore import QMargins
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QMenu, QAction
+from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QWheelEvent
 from bisect import bisect_left
 import cv2  # pip install --upgrade opencv-python
 import numpy as np
@@ -101,6 +100,48 @@ class Label(QWidget):
             painter.drawPixmap(self.rect(), self.p)
 
 
+    def contextMenuEvent(self, QContextMenuEvent):
+        cmenu = QMenu(self)
+        page = self.parentWidget()
+        positionx = QContextMenuEvent.x()
+        positiony = QContextMenuEvent.y()
+        logging.info(str(positionx) + ' ' + str(positiony))
+        # min(abs(positionx - vl) for vl in page.image.coords_of_vert_lns)
+        # min(abs(positiony - vl) for vl in page.image.coords_of_horiz_lns)
+        # TODO Этот кусок кода работает написан неправильно
+        # TODO Его нужно переписать
+        state = False
+        for i in page.image.coords_of_vert_lns:
+            if i in range(positiony - BORDER_WIDTH, positiony + BORDER_WIDTH + 1):
+                state = True
+        for i in page.image.coords_of_horiz_lns:
+            if i in range(positionx - 5, positionx + BORDER_WIDTH + 1):
+                state = True
+        if state:
+            DelHorAction = cmenu.addAction('Delete Horizontal line here')
+            DelVertAction = cmenu.addAction('Delete Vertical line here')
+        else:
+            AddHorAction = cmenu.addAction('Add Horizontal line here')
+            AddVertAction = cmenu.addAction('Add Vertical line here')
+        action = cmenu.exec_(self.mapToGlobal(QContextMenuEvent.pos()))
+
+
+    def mousePressEvent(self, a0: QMouseEvent):
+        button_pressed = a0.button()
+        page = self.parentWidget()
+        cursor_pos_x = int(a0.x())
+        cursor_pos_y = int(a0.y())
+        logging.info(str(cursor_pos_x) + ' ' + str(cursor_pos_y))
+        if button_pressed == 1:
+            cell_pos = page.image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.width(), self.height())
+            if cell_pos:
+                page.image.toggle_highlight_cell(*cell_pos)
+            page.qp.loadFromData(page.image.to_bin())
+            page.lb.setPixmap(page.qp)
+            page.lb.update()
+
+
+
 class ScannedPageWidget(QWidget):
     def __init__(self, image, parent=None):
         QWidget.__init__(self, parent=parent)
@@ -113,16 +154,8 @@ class ScannedPageWidget(QWidget):
         self.lb.setPixmap(self.qp)
         self.lay.addWidget(self.lb)
 
-    def mousePressEvent(self, a0: QMouseEvent):
-        cursor_pos_x = int(a0.x())
-        cursor_pos_y = int(a0.y())
-        logging.info(str(cursor_pos_x) + ' ' + str(cursor_pos_y))
-        cell_pos = self.image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.width(), self.height())
-        if cell_pos:
-            self.image.toggle_highlight_cell(*cell_pos)
-        self.qp.loadFromData(self.image.to_bin())
-        self.lb.setPixmap(self.qp)
-        self.lb.update()
+    def wheelEvent(self, a0: QWheelEvent):
+        pass
 
 def show(image):
     mx = max(image.H, image.W)
