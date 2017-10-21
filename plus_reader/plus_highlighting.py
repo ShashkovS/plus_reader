@@ -1,12 +1,13 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QMenu, QAction
-from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QWheelEvent
-from bisect import bisect_left
 import cv2  # pip install --upgrade opencv-python
 import numpy as np
 import logging
 import sys
 import traceback
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QMenu
+from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QWheelEvent
+from bisect import bisect_left
+from cell_recognizer import recognize_cell
 sys._excepthook = sys.excepthook
 
 def excepthook(excType, excValue, tracebackobj):
@@ -67,8 +68,7 @@ class ImageProcessor():
                 self.image[h1:h2, :, :] = .7 * self.image[h1:h2, :, :] + .3 * BORDER_COLOR
 
     def coord_to_cell(self, x, y, w, h):
-        real_x_coord = x * self.W / w
-        real_y_coord = y * self.H / h
+        real_x_coord, real_y_coord = self.window_coords_to_image_coords(x, y, w, h)
         x_ind = bisect_left(self.coords_of_vert_lns, real_x_coord) - 1
         y_ind = bisect_left(self.coords_of_horiz_lns, real_y_coord) - 1
         if x_ind < 0 or y_ind < 0 or x_ind >= len(self.coords_of_vert_lns) - 1 or y_ind >= len(self.coords_of_horiz_lns) - 1:
@@ -77,6 +77,11 @@ class ImageProcessor():
             res = [x_ind, y_ind]
         logging.info(str(res))
         return res
+
+    def window_coords_to_image_coords(self, x, y, w, h):
+        real_x_coord = x * self.W / w
+        real_y_coord = y * self.H / h
+        return real_x_coord, real_y_coord
 
 
     def to_bin(self):
@@ -106,22 +111,19 @@ class Label(QWidget):
         positionx = QContextMenuEvent.x()
         positiony = QContextMenuEvent.y()
         logging.info(str(positionx) + ' ' + str(positiony))
-        # min(abs(positionx - vl) for vl in page.image.coords_of_vert_lns)
-        # min(abs(positiony - vl) for vl in page.image.coords_of_horiz_lns)
-        # TODO Этот кусок кода работает написан неправильно
+        # TODO Этот кусок кода работает неправильно
         # TODO Его нужно переписать
-        state = False
-        for i in page.image.coords_of_vert_lns:
-            if i in range(positiony - BORDER_WIDTH, positiony + BORDER_WIDTH + 1):
-                state = True
-        for i in page.image.coords_of_horiz_lns:
-            if i in range(positionx - 5, positionx + BORDER_WIDTH + 1):
-                state = True
-        if state:
+        im_pos_x, im_pos_y = page.image.window_coords_to_image_coords(positionx, positiony, self.width(), self.height())
+        logging.info(str(positionx) + ' ' + str(positiony) + ' -> ' + str(im_pos_x) + ' ' + str(im_pos_y))
+        min_vline_dist = min(abs(im_pos_x - vl) for vl in page.image.coords_of_vert_lns)
+        min_hline_dist = min(abs(im_pos_y - vl) for vl in page.image.coords_of_horiz_lns)
+        if min_hline_dist <= BORDER_WIDTH * 3:
             DelHorAction = cmenu.addAction('Delete Horizontal line here')
-            DelVertAction = cmenu.addAction('Delete Vertical line here')
         else:
             AddHorAction = cmenu.addAction('Add Horizontal line here')
+        if min_vline_dist <= BORDER_WIDTH * 3:
+            DelVertAction = cmenu.addAction('Delete Vertical line here')
+        else:
             AddVertAction = cmenu.addAction('Add Vertical line here')
         action = cmenu.exec_(self.mapToGlobal(QContextMenuEvent.pos()))
 
@@ -153,9 +155,6 @@ class ScannedPageWidget(QWidget):
         self.qp.loadFromData(self.image.to_bin())
         self.lb.setPixmap(self.qp)
         self.lay.addWidget(self.lb)
-
-    def wheelEvent(self, a0: QWheelEvent):
-        pass
 
 def show(image):
     mx = max(image.H, image.W)
