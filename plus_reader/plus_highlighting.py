@@ -7,6 +7,7 @@ from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QMenu
 
 import ImageProcessor
+from cell_recognizer import find_filled_cells
 
 sys._excepthook = sys.excepthook
 
@@ -50,7 +51,7 @@ class Label(QWidget):
         min_hline_dist = min(abs(im_pos_y - vl) for vl in page.image.coords_of_horiz_lns)
         self._actions = []
         self._actions_objects = []
-        if min_hline_dist <= BORDER_WIDTH * 3:
+        if min_hline_dist <= BORDER_WIDTH:
             DelHorAction = cmenu.addAction('Delete Horizontal line here')
             self._actions.append('DelHorAction')
             self._actions_objects.append(DelHorAction )
@@ -58,7 +59,7 @@ class Label(QWidget):
             AddHorAction = cmenu.addAction('Add Horizontal line here')
             self._actions.append('AddHorAction')
             self._actions_objects.append(AddHorAction )
-        if min_vline_dist <= BORDER_WIDTH * 3:
+        if min_vline_dist <= BORDER_WIDTH:
             DelVertAction = cmenu.addAction('Delete Vertical line here')
             self._actions.append('DelVertAction')
             self._actions_objects.append(DelVertAction )
@@ -70,49 +71,42 @@ class Label(QWidget):
         if action:
             selected_action_index = self._actions_objects.index(action)
             selected_action = self._actions[selected_action_index]
-            print(selected_action )
+            logging.info(str(selected_action))
+            # TODO работающих методов ещё нет поэтому этот кусок пока не нужен
+            # method = getattr(self, selected_action)
+            # method((im_pos_x, im_pos_y))
 
-        print(self.pa(action))
-        # TODO Поправить код на точное орпределение действия action
-        # TODO Сейчас обрабатываются все сразу которые есть в меню
-        method_name = str(self._actions[0])
-        method = getattr(self, method_name)
-        method((im_pos_x, im_pos_y))
-        method_name = str(self._actions[1])
-        method = getattr(self, method_name)
-        method((im_pos_x, im_pos_y))
-    # TODO Дебажный кусок кода( удалению не подлежит :-))
-    def pa(self, obj):
-        print('*' * 100)
-        print(type(obj), obj)
-        dr = [x for x in dir(obj) if not x.startswith('__')]
-        cur = {}
-        for atr in dr:
-            if atr == 'label':
-                pass
-            txt = str(obj.__getattribute__(atr)).replace('\n', '')
-            if txt in ['None']:
-                continue
-            if txt.startswith('<') and txt.endswith('>') and ' at ' in txt:
-                continue
-            cur[atr] = txt
-        return cur
-
+    # TODO Дальше написан неработающий код методов
+    # TODO Надо исправлять
     def AddHorAction(self, coords):
         logging.info('ДОБАВИТЬ ГОРИЗОНТАЛЬ')
-        pass
+        page = self.parentWidget()
+        page.image.coords_of_horiz_lns.append(coords[0])
+        # TODO Вот тут ошибка TypeError: slice indices must be integers or None or have an __index__ method
+        # page.image.filled_cells = find_filled_cells(page.image.image, page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
+        # page.image.initial_mark_filled_cells()
+        # page.qp.loadFromData(page.image.to_bin())
+        # page.lb.setPixmap(page.qp)
+        # page.lb.update()
+
 
     def DelHorAction(self, coords):
         logging.info('УДАЛИТЬ ГОРИЗОНТАЛЬ')
-        pass
+        page = self.parentWidget()
+        # TODO Тут надо точное определение линии по приблизительным координатам
+        # page.image.coords_of_horiz_lns.remove(coords[1])
 
     def DelVertAction(self, coords):
         logging.info('УДАЛИТЬ ВЕРТИКАЛЬ')
-        pass
+        page = self.parentWidget()
+        # TODO Тут надо точное определение линии по приблизительным координатам
+        # page.image.coords_of_vert_lns.remove(coords[0])
 
     def AddVertAction(self, coords):
         logging.info('ДОБАВИТЬ ВЕРТИКАЛЬ')
-        pass
+        page = self.parentWidget()
+        # TODO Добавить переобработку изображения
+        page.image.coords_of_vert_lns.append(coords[1])
 
 
     def mousePressEvent(self, a0: QMouseEvent):
@@ -155,7 +149,6 @@ def show(image):
 
 
 def feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns):
-    global image
     image = ImageProcessor.ImageProcessor(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
     show(image)
     return filled_cells
