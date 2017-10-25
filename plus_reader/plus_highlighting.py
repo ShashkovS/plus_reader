@@ -48,45 +48,55 @@ class Label(QWidget):
         logging.info(str(positionx) + ' ' + str(positiony) + ' -> ' + str(im_pos_x) + ' ' + str(im_pos_y))
         min_vline_dist = min(abs(im_pos_x - vl) for vl in page.image.coords_of_vert_lns)
         min_hline_dist = min(abs(im_pos_y - vl) for vl in page.image.coords_of_horiz_lns)
-        actions = []
+        self._actions = []
+        self._actions_objects = []
         if min_hline_dist <= BORDER_WIDTH * 3:
             DelHorAction = cmenu.addAction('Delete Horizontal line here')
-            actions.append('DelHorAction')
+            self._actions.append('DelHorAction')
+            self._actions_objects.append(DelHorAction )
         else:
             AddHorAction = cmenu.addAction('Add Horizontal line here')
-            actions.append('AddHorAction')
+            self._actions.append('AddHorAction')
+            self._actions_objects.append(AddHorAction )
         if min_vline_dist <= BORDER_WIDTH * 3:
             DelVertAction = cmenu.addAction('Delete Vertical line here')
-            actions.append('DelVertAction')
+            self._actions.append('DelVertAction')
+            self._actions_objects.append(DelVertAction )
         else:
             AddVertAction = cmenu.addAction('Add Vertical line here')
-            actions.append('AddVertAction')
+            self._actions.append('AddVertAction')
+            self._actions_objects.append(AddVertAction )
         action = cmenu.exec_(self.mapToGlobal(QContextMenuEvent.pos()))
+        if action:
+            selected_action_index = self._actions_objects.index(action)
+            selected_action = self._actions[selected_action_index]
+            print(selected_action )
+
         print(self.pa(action))
         # TODO Поправить код на точное орпределение действия action
         # TODO Сейчас обрабатываются все сразу которые есть в меню
-        # method_name = str(actions[0])
-        # method = getattr(self, method_name)
-        # method((im_pos_x, im_pos_y))
-        # method_name = str(actions[1])
-        # method = getattr(self, method_name)
-        # method((im_pos_x, im_pos_y))
+        method_name = str(self._actions[0])
+        method = getattr(self, method_name)
+        method((im_pos_x, im_pos_y))
+        method_name = str(self._actions[1])
+        method = getattr(self, method_name)
+        method((im_pos_x, im_pos_y))
     # TODO Дебажный кусок кода( удалению не подлежит :-))
-    # def pa(self, obj):
-    #     print('*' * 100)
-    #     print(type(obj), obj)
-    #     dr = [x for x in dir(obj) if not x.startswith('__')]
-    #     cur = {}
-    #     for atr in dr:
-    #         if atr == 'label':
-    #             pass
-    #         txt = str(obj.__getattribute__(atr)).replace('\n', '')
-    #         if txt in ['None']:
-    #             continue
-    #         if txt.startswith('<') and txt.endswith('>') and ' at ' in txt:
-    #             continue
-    #         cur[atr] = txt
-    #     return cur
+    def pa(self, obj):
+        print('*' * 100)
+        print(type(obj), obj)
+        dr = [x for x in dir(obj) if not x.startswith('__')]
+        cur = {}
+        for atr in dr:
+            if atr == 'label':
+                pass
+            txt = str(obj.__getattribute__(atr)).replace('\n', '')
+            if txt in ['None']:
+                continue
+            if txt.startswith('<') and txt.endswith('>') and ' at ' in txt:
+                continue
+            cur[atr] = txt
+        return cur
 
     def AddHorAction(self, coords):
         logging.info('ДОБАВИТЬ ГОРИЗОНТАЛЬ')
