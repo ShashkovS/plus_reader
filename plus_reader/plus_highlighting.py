@@ -51,42 +51,58 @@ class Label(QWidget):
         actions = []
         if min_hline_dist <= BORDER_WIDTH * 3:
             DelHorAction = cmenu.addAction('Delete Horizontal line here')
-            actions.append('_DelHorLine')
+            actions.append('DelHorAction')
         else:
             AddHorAction = cmenu.addAction('Add Horizontal line here')
-            actions.append('_AddHorLine')
+            actions.append('AddHorAction')
         if min_vline_dist <= BORDER_WIDTH * 3:
             DelVertAction = cmenu.addAction('Delete Vertical line here')
-            actions.append('_DelVertLine')
+            actions.append('DelVertAction')
         else:
             AddVertAction = cmenu.addAction('Add Vertical line here')
-            actions.append('_AddVertLine')
+            actions.append('AddVertAction')
         action = cmenu.exec_(self.mapToGlobal(QContextMenuEvent.pos()))
+        print(self.pa(action))
         # TODO Поправить код на точное орпределение действия action
         # TODO Сейчас обрабатываются все сразу которые есть в меню
-        method_name = str(actions[0])
-        method = getattr(self, method_name)
-        method((im_pos_x, im_pos_y))
-        method_name = str(actions[1])
-        method = getattr(self, method_name)
-        method((im_pos_x, im_pos_y))
+        # method_name = str(actions[0])
+        # method = getattr(self, method_name)
+        # method((im_pos_x, im_pos_y))
+        # method_name = str(actions[1])
+        # method = getattr(self, method_name)
+        # method((im_pos_x, im_pos_y))
+    # TODO Дебажный кусок кода( удалению не подлежит :-))
+    # def pa(self, obj):
+    #     print('*' * 100)
+    #     print(type(obj), obj)
+    #     dr = [x for x in dir(obj) if not x.startswith('__')]
+    #     cur = {}
+    #     for atr in dr:
+    #         if atr == 'label':
+    #             pass
+    #         txt = str(obj.__getattribute__(atr)).replace('\n', '')
+    #         if txt in ['None']:
+    #             continue
+    #         if txt.startswith('<') and txt.endswith('>') and ' at ' in txt:
+    #             continue
+    #         cur[atr] = txt
+    #     return cur
 
-    def _AddHorLine(self, coords):
+    def AddHorAction(self, coords):
         logging.info('ДОБАВИТЬ ГОРИЗОНТАЛЬ')
         pass
 
-    def _DelHorLine(self, coords):
+    def DelHorAction(self, coords):
         logging.info('УДАЛИТЬ ГОРИЗОНТАЛЬ')
         pass
 
-    def _DelVertLine(self, coords):
+    def DelVertAction(self, coords):
         logging.info('УДАЛИТЬ ВЕРТИКАЛЬ')
         pass
 
-    def _AddVertLine(self, coords):
+    def AddVertAction(self, coords):
         logging.info('ДОБАВИТЬ ВЕРТИКАЛЬ')
         pass
-
 
 
     def mousePressEvent(self, a0: QMouseEvent):

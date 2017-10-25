@@ -10,7 +10,7 @@ from time import time
 from image_iterator import extract_images_from_files
 #if importlib.util.find_spec('PyQt5'):
 from plus_highlighting import feature_qt
-from cell_recognizer import recognize_cell
+from cell_recognizer import find_filled_cells
 
 np.set_printoptions(linewidth=200)
 
@@ -212,18 +212,6 @@ def calcutale_lines_coords(horizontal_lines, vertical_lines):
                 lines[i][j-1] = 0
         cv2.imwrite("_lines.png", lines)
     return hor, vert
-
-
-def find_filled_cells(gray_np_image, coords_of_horiz_lns, coords_of_vert_lns):
-    """Самая главная функция — определяет, заполнена ли ячейка
-    """
-    rows, colums = len(coords_of_horiz_lns) - 1, len(coords_of_vert_lns) - 1
-    filled = np.zeros((rows, colums), np.bool)
-    for i in range(rows):
-        for j in range(colums):
-            block = gray_np_image[coords_of_horiz_lns[i]:coords_of_horiz_lns[i + 1], coords_of_vert_lns[j]:coords_of_vert_lns[j + 1]]
-            filled[i][j] = bool(recognize_cell(block))
-    return filled
 
 
 def prc_one_image(np_image, pgnum=[0]):
