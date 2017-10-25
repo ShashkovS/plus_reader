@@ -10,6 +10,7 @@ from time import time
 from image_iterator import extract_images_from_files
 #if importlib.util.find_spec('PyQt5'):
 from plus_highlighting import feature_qt
+from cell_recognizer import find_filled_cells
 
 np.set_printoptions(linewidth=200)
 
@@ -99,7 +100,7 @@ def remove_background(gray_np_image):
     """Удаляет мелкий сор из изображения"""
     med = cv2.medianBlur(gray_np_image, 75)
     dif = cv2.add(gray_np_image, 255-med)
-    if VERBOSE:
+    if DEBUG:
         cv2.imwrite("_med.png", med)
     return dif
 
@@ -211,25 +212,6 @@ def calcutale_lines_coords(horizontal_lines, vertical_lines):
                 lines[i][j-1] = 0
         cv2.imwrite("_lines.png", lines)
     return hor, vert
-
-
-def find_filled_cells(gray_np_image, hor, vert):
-    """Самая главная функция — определяет, заполнена ли ячейка
-    """
-    # TODO: убрать магические константы
-    MIN_FILLED_PART = 0.030
-    MIN_FILLED_DOTS = gray_np_image.size / 9000
-    BLACK_DOT_THRESHOLD = 225
-    rows, colums = len(hor) - 1, len(vert) - 1
-    filled = np.zeros((rows, colums), np.bool)
-    for i in range(rows):
-        for j in range(colums):
-            block = gray_np_image[hor[i]:hor[i+1], vert[j]:vert[j+1]]
-            # logging.info('block shape = ' + str(block.shape))
-            part = 1 - (np.sum(block) / block.size / 255)
-            filled[i][j] = (part >= MIN_FILLED_PART or
-                            block[block < BLACK_DOT_THRESHOLD].size >= MIN_FILLED_DOTS)
-    return filled
 
 
 def prc_one_image(np_image, pgnum=[0]):
