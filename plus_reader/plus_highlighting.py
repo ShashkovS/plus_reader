@@ -12,7 +12,7 @@ from cell_recognizer import find_filled_cells
 sys._excepthook = sys.excepthook
 
 def excepthook(excType, excValue, tracebackobj):
-    traceback.print_tb(tracebackobj)
+    traceback.print_tb(tracebackobj, excType, excValue)
 sys.excepthook = excepthook
 
 
@@ -38,14 +38,12 @@ class Label(QWidget):
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
             painter.drawPixmap(self.rect(), self.p)
 
-
     def contextMenuEvent(self, QContextMenuEvent):
         cmenu = QMenu(self)
         page = self.parentWidget()
         positionx = QContextMenuEvent.x()
         positiony = QContextMenuEvent.y()
-        logging.info(str(positionx) + ' ' + str(positiony))
-        im_pos_x, im_pos_y = page.image.window_coords_to_image_coords(positionx, positiony, self.width(), self.height())
+        im_pos_x, im_pos_y = list(map(int, page.image.window_coords_to_image_coords(positionx, positiony, self.width(), self.height())))
         logging.info(str(positionx) + ' ' + str(positiony) + ' -> ' + str(im_pos_x) + ' ' + str(im_pos_y))
         min_vline_dist = min(abs(im_pos_x - vl) for vl in page.image.coords_of_vert_lns)
         min_hline_dist = min(abs(im_pos_y - vl) for vl in page.image.coords_of_horiz_lns)
@@ -73,40 +71,39 @@ class Label(QWidget):
             selected_action = self._actions[selected_action_index]
             logging.info(str(selected_action))
             # TODO работающих методов ещё нет поэтому этот кусок пока не нужен
-            # method = getattr(self, selected_action)
-            # method((im_pos_x, im_pos_y))
+            method = getattr(self, selected_action)
+            method((im_pos_x, im_pos_y))
 
-    # TODO Дальше написан неработающий код методов
-    # TODO Надо исправлять
     def AddHorAction(self, coords):
         logging.info('ДОБАВИТЬ ГОРИЗОНТАЛЬ')
         page = self.parentWidget()
-        page.image.coords_of_horiz_lns.append(coords[0])
-        # TODO Вот тут ошибка TypeError: slice indices must be integers or None or have an __index__ method
-        # page.image.filled_cells = find_filled_cells(page.image.image, page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
-        # page.image.initial_mark_filled_cells()
-        # page.qp.loadFromData(page.image.to_bin())
-        # page.lb.setPixmap(page.qp)
-        # page.lb.update()
+        page.image.coords_of_horiz_lns.append(coords[1])
+        coords_of_horiz_lns = sorted(page.image.coords_of_horiz_lns)
+        filled_cells = find_filled_cells(page.image.np_image, coords_of_horiz_lns, page.image.coords_of_vert_lns)
+        page.image = ImageProcessor.ImageProcessor(page.image.np_image, filled_cells, coords_of_horiz_lns,
+                                                   page.image.coords_of_vert_lns)
+        page.image.initial_mark_filled_cells()
+        page.qp.loadFromData(page.image.to_bin())
+        page.lb.setPixmap(page.qp)
+        page.lb.update()
 
 
     def DelHorAction(self, coords):
         logging.info('УДАЛИТЬ ГОРИЗОНТАЛЬ')
         page = self.parentWidget()
-        # TODO Тут надо точное определение линии по приблизительным координатам
-        # page.image.coords_of_horiz_lns.remove(coords[1])
+        page.image.coords_of_horiz_lns.remove(coords[1])
 
     def DelVertAction(self, coords):
         logging.info('УДАЛИТЬ ВЕРТИКАЛЬ')
         page = self.parentWidget()
         # TODO Тут надо точное определение линии по приблизительным координатам
-        # page.image.coords_of_vert_lns.remove(coords[0])
+        page.image.coords_of_vert_lns.remove(coords[0])
 
     def AddVertAction(self, coords):
         logging.info('ДОБАВИТЬ ВЕРТИКАЛЬ')
         page = self.parentWidget()
         # TODO Добавить переобработку изображения
-        page.image.coords_of_vert_lns.append(coords[1])
+        page.image.coords_of_vert_lns.append(coords[0])
 
 
     def mousePressEvent(self, a0: QMouseEvent):

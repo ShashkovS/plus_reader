@@ -12,6 +12,7 @@ MAX_SIZE = 800
 class ImageProcessor():
     def __init__(self, image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns, *, show_borders=True):
         """Сохраняем все данные в атрибутах, производим первичную раскраску"""
+        self.np_image = image
         self.image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         self.H, self.W, *_ = image.shape
         self.filled_cells = filled_cells

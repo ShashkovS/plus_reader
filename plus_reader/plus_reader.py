@@ -287,9 +287,9 @@ if __name__ == '__main__':
     # images = extract_images_from_files('tst_01.pdf', pages_to_process=[0, 1])
     # np_images = (np.array(img.convert("L")) for img in images)
     # recognized_pages = prc_all_images(np_images, njobs=2)
-    #gray_np_image = cv2.cvtColor(cv2.imread('test_prepated_image_01.png'), cv2.COLOR_BGR2GRAY)
+    # gray_np_image = cv2.cvtColor(cv2.imread('test_prepated_image_01.png'), cv2.COLOR_BGR2GRAY)
     # gray_np_image = cv2.cvtColor(cv2.imread('bad_scan.png'), cv2.COLOR_BGR2GRAY)
-    #filled_cells, coords_of_horiz_lns, coords_of_vert_lns = prc_one_prepared_image(gray_np_image)
+    # filled_cells, coords_of_horiz_lns, coords_of_vert_lns = prc_one_prepared_image(gray_np_image)
     # # Запишем в дамп, чтобы запускалось быстрее
     # with open(r'test_dump_2.pickle', 'wb') as f:
     #     pickle.dump((gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns), f)
