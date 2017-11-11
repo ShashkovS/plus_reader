@@ -26,7 +26,7 @@ def _tiff_header_for_CCITT(width: int, height: int, img_size: int, CCITT_group=4
                        262, 3, 1, 0,  # Threshholding, SHORT, 1, 0 = WhiteIsZero
                        273, 4, 1, struct.calcsize(tiff_header_struct),  # StripOffsets, LONG, 1, len of header
                        278, 4, 1, height,  # RowsPerStrip, LONG, 1, lenght
-                       279, 4, 1, img_size,  # StripByteCounts, LONG, 1, size of image
+                       279, 4, 1, img_size,  # StripByteCounts, LONG, 1, size of bgr_img_with_highlights
                        0  # last IFD
                        )
 
@@ -113,6 +113,6 @@ def extract_images_from_files(filenames, pages_to_process=None):
         if filename.lower().endswith('.pdf'):
             yield from yield_images_from_pdf(filename, pages_to_process)
         else:
-            # If it is not a pdf, than it must be an image
+            # If it is not a pdf, than it must be an bgr_img_with_highlights
             img = Image.open(filename)
             yield img

@@ -77,13 +77,10 @@ class Label(QWidget):
     def AddHorAction(self, coords):
         logging.info('ДОБАВИТЬ ГОРИЗОНТАЛЬ')
         page = self.parentWidget()
-        page.image.coords_of_horiz_lns.append(coords[1])
-        coords_of_horiz_lns = sorted(page.image.coords_of_horiz_lns)
-        filled_cells = find_filled_cells(page.image.np_image, coords_of_horiz_lns, page.image.coords_of_vert_lns)
-        page.image = ImageProcessor.ImageProcessor(page.image.np_image, filled_cells, coords_of_horiz_lns,
-                                                   page.image.coords_of_vert_lns)
-        page.image.initial_mark_filled_cells()
-        page.qp.loadFromData(page.image.to_bin())
+        page.image.coords_of_horiz_lns.append(coords[1])  # TODO: Сделать бисектом
+        page.image.coords_of_horiz_lns.sort()
+        # TODO Перераспознование
+        page.qp.loadFromData(image.to_bin())
         page.lb.setPixmap(page.qp)
         page.lb.update()
 
@@ -102,8 +99,12 @@ class Label(QWidget):
     def AddVertAction(self, coords):
         logging.info('ДОБАВИТЬ ВЕРТИКАЛЬ')
         page = self.parentWidget()
-        # TODO Добавить переобработку изображения
         page.image.coords_of_vert_lns.append(coords[0])
+        page.image.coords_of_vert_lns.sort()
+        # TODO Перераспознование
+        page.qp.loadFromData(image.to_bin())
+        page.lb.setPixmap(page.qp)
+        page.lb.update()
 
 
     def mousePressEvent(self, a0: QMouseEvent):
@@ -145,10 +146,9 @@ def show(image):
     app.exec_()
 
 
-def feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns):
-    image = ImageProcessor.ImageProcessor(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
-    show(image)
-    return filled_cells
+def feature_qt(image_cls):
+    show(image_cls)
+    return image_cls.filled_cells
 
 
 if __name__ == '__main__':
