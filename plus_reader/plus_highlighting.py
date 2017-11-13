@@ -3,10 +3,9 @@ import sys
 import traceback
 import cv2
 import numpy as np
+import bisect
 from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QMenu
-
-import ImageProcessor
 from cell_recognizer import find_filled_cells
 
 sys._excepthook = sys.excepthook
@@ -92,7 +91,7 @@ class Label(QWidget):
     def DelHorAction(self, coords):
         logging.info('УДАЛИТЬ ГОРИЗОНТАЛЬ')
         page = self.parentWidget()
-        page.image.coords_of_horiz_lns.remove(coords[1])
+        page.image.coords_of_horiz_lns.remove(page.image.coords_of_horiz_lns[bisect.bisect_right(page.image.coords_of_vert_lns, coords[1]) - 1])
         page.image.filled_cells = find_filled_cells(page.image.image_without_lines,
                                                     page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
         page.image.bgr_img_with_highlights = cv2.cvtColor(page.image.gray_np_image, cv2.COLOR_GRAY2BGR)
@@ -104,8 +103,7 @@ class Label(QWidget):
     def DelVertAction(self, coords):
         logging.info('УДАЛИТЬ ВЕРТИКАЛЬ')
         page = self.parentWidget()
-        # TODO Тут надо точное определение линии по приблизительным координатам
-        page.image.coords_of_vert_lns.remove(coords[0])
+        page.image.coords_of_vert_lns.remove(page.image.coords_of_vert_lns[bisect.bisect_right(page.image.coords_of_vert_lns, coords[0]) - 1])
         page.image.filled_cells = find_filled_cells(page.image.image_without_lines,
                                                     page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
         page.image.bgr_img_with_highlights = cv2.cvtColor(page.image.gray_np_image, cv2.COLOR_GRAY2BGR)
