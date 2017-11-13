@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-.
 import logging
 import os
-import cv2  # pip install --upgrade opencv-python
 import numpy as np  # conda install numpy
 import importlib
 import pickle

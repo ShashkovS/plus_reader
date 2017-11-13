@@ -1,7 +1,7 @@
 import logging
 import sys
 import traceback
-
+import cv2
 import numpy as np
 from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QMenu
@@ -79,8 +79,12 @@ class Label(QWidget):
         page = self.parentWidget()
         page.image.coords_of_horiz_lns.append(coords[1])  # TODO: Сделать бисектом
         page.image.coords_of_horiz_lns.sort()
+        page.image.filled_cells = find_filled_cells(page.image.image_without_lines,
+                                                    page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
+        page.image.bgr_img_with_highlights = cv2.cvtColor(page.image.gray_np_image, cv2.COLOR_GRAY2BGR)
+        page.image.initial_mark_filled_cells()
         # TODO Перераспознование
-        page.qp.loadFromData(image.to_bin())
+        page.qp.loadFromData(page.image.to_bin())
         page.lb.setPixmap(page.qp)
         page.lb.update()
 
@@ -89,20 +93,39 @@ class Label(QWidget):
         logging.info('УДАЛИТЬ ГОРИЗОНТАЛЬ')
         page = self.parentWidget()
         page.image.coords_of_horiz_lns.remove(coords[1])
+        page.image.filled_cells = find_filled_cells(page.image.image_without_lines,
+                                                    page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
+        page.image.bgr_img_with_highlights = cv2.cvtColor(page.image.gray_np_image, cv2.COLOR_GRAY2BGR)
+        page.image.initial_mark_filled_cells()
+        page.qp.loadFromData(page.image.to_bin())
+        page.lb.setPixmap(page.qp)
+        page.lb.update()
 
     def DelVertAction(self, coords):
         logging.info('УДАЛИТЬ ВЕРТИКАЛЬ')
         page = self.parentWidget()
         # TODO Тут надо точное определение линии по приблизительным координатам
         page.image.coords_of_vert_lns.remove(coords[0])
+        page.image.filled_cells = find_filled_cells(page.image.image_without_lines,
+                                                    page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
+        page.image.bgr_img_with_highlights = cv2.cvtColor(page.image.gray_np_image, cv2.COLOR_GRAY2BGR)
+        page.image.initial_mark_filled_cells()
+        page.qp.loadFromData(page.image.to_bin())
+        page.lb.setPixmap(page.qp)
+        page.lb.update()
 
     def AddVertAction(self, coords):
         logging.info('ДОБАВИТЬ ВЕРТИКАЛЬ')
         page = self.parentWidget()
         page.image.coords_of_vert_lns.append(coords[0])
         page.image.coords_of_vert_lns.sort()
+        page.image.filled_cells = find_filled_cells(page.image.image_without_lines,
+                                                    page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
+        page.image.bgr_img_with_highlights = cv2.cvtColor(page.image.gray_np_image, cv2.COLOR_GRAY2BGR)
+        page.image.initial_mark_filled_cells()
+
         # TODO Перераспознование
-        page.qp.loadFromData(image.to_bin())
+        page.qp.loadFromData(page.image.to_bin())
         page.lb.setPixmap(page.qp)
         page.lb.update()
 
