@@ -1,7 +1,6 @@
 import cv2
 import logging
 import numpy as np
-from PIL import Image as PIL_Image
 from bisect import bisect_left
 from cell_recognizer import find_filled_cells
 

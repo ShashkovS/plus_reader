@@ -10,8 +10,11 @@ from cell_recognizer import find_filled_cells
 
 sys._excepthook = sys.excepthook
 
+
 def excepthook(excType, excValue, tracebackobj):
     traceback.print_tb(tracebackobj, excType, excValue)
+
+
 sys.excepthook = excepthook
 
 
@@ -19,8 +22,6 @@ FILL_COLOR = np.array([[[0, 255, 255]]], dtype=np.uint8)
 BORDER_COLOR = np.array([[[0, 0, 255]]], dtype=np.uint8)
 BORDER_WIDTH = 5
 MAX_SIZE = 800
-
-
 
 
 class Label(QWidget):
@@ -48,7 +49,7 @@ class Label(QWidget):
         min_hline_dist = min(abs(im_pos_y - vl) for vl in page.image.coords_of_horiz_lns)
         self._actions = []
         self._actions_objects = []
-        if min_hline_dist <= BORDER_WIDTH:
+        if min_hline_dist <= BORDER_WIDTH * 3:
             DelHorAction = cmenu.addAction('Delete Horizontal line here')
             self._actions.append('DelHorAction')
             self._actions_objects.append(DelHorAction )
@@ -56,7 +57,7 @@ class Label(QWidget):
             AddHorAction = cmenu.addAction('Add Horizontal line here')
             self._actions.append('AddHorAction')
             self._actions_objects.append(AddHorAction )
-        if min_vline_dist <= BORDER_WIDTH:
+        if min_vline_dist <= BORDER_WIDTH * 3:
             DelVertAction = cmenu.addAction('Delete Vertical line here')
             self._actions.append('DelVertAction')
             self._actions_objects.append(DelVertAction )
@@ -87,11 +88,17 @@ class Label(QWidget):
         page.lb.setPixmap(page.qp)
         page.lb.update()
 
-
     def DelHorAction(self, coords):
         logging.info('УДАЛИТЬ ГОРИЗОНТАЛЬ')
         page = self.parentWidget()
-        page.image.coords_of_horiz_lns.remove(page.image.coords_of_horiz_lns[bisect.bisect_right(page.image.coords_of_vert_lns, coords[1]) - 1])
+        min_dist = float('inf')
+        min_line = float('inf')
+        for i in page.image.coords_of_horiz_lns:
+            dist = abs(i - coords[1])
+            if dist < min_dist:
+                min_dist = dist
+                min_line = i
+        page.image.coords_of_horiz_lns.remove(min_line)
         page.image.filled_cells = find_filled_cells(page.image.image_without_lines,
                                                     page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
         page.image.bgr_img_with_highlights = cv2.cvtColor(page.image.gray_np_image, cv2.COLOR_GRAY2BGR)
@@ -103,7 +110,14 @@ class Label(QWidget):
     def DelVertAction(self, coords):
         logging.info('УДАЛИТЬ ВЕРТИКАЛЬ')
         page = self.parentWidget()
-        page.image.coords_of_vert_lns.remove(page.image.coords_of_vert_lns[bisect.bisect_right(page.image.coords_of_vert_lns, coords[0]) - 1])
+        min_dist = float('inf')
+        min_line = float('inf')
+        for i in page.image.coords_of_vert_lns:
+            dist = abs(i - coords[0])
+            if dist < min_dist:
+                min_dist = dist
+                min_line = i
+        page.image.coords_of_vert_lns.remove(min_line)
         page.image.filled_cells = find_filled_cells(page.image.image_without_lines,
                                                     page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
         page.image.bgr_img_with_highlights = cv2.cvtColor(page.image.gray_np_image, cv2.COLOR_GRAY2BGR)
@@ -121,12 +135,10 @@ class Label(QWidget):
                                                     page.image.coords_of_horiz_lns, page.image.coords_of_vert_lns)
         page.image.bgr_img_with_highlights = cv2.cvtColor(page.image.gray_np_image, cv2.COLOR_GRAY2BGR)
         page.image.initial_mark_filled_cells()
-
         # TODO Перераспознование
         page.qp.loadFromData(page.image.to_bin())
         page.lb.setPixmap(page.qp)
         page.lb.update()
-
 
     def mousePressEvent(self, a0: QMouseEvent):
         button_pressed = a0.button()

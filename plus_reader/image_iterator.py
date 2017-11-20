@@ -30,6 +30,7 @@ def _tiff_header_for_CCITT(width: int, height: int, img_size: int, CCITT_group=4
                        0  # last IFD
                        )
 
+
 def yield_images_from_pdf(pdf_filename, pages_to_process=None):
     """Изображение в pdf согласно стандарту может быть закодировано одним из следующих способов:
     ASCIIHexDecode ASCII85Decode LZWDecode FlateDecode RunLengthDecode CCITTFaxDecode JBIG2Decode JPXDecode
