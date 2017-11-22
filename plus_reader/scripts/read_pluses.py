@@ -12,7 +12,7 @@ def main(args=None):
         description='Reads tables of pluses or other marks on scans (pdf or images)'
     )
     # TODO: Сделать нормальные параметры
-    parser.add_argument('image', nargs='+')
+    parser.add_argument('bgr_img_with_highlights', nargs='+')
     parser.add_argument('pdf', nargs='+')
     parser.add_argument('dest', nargs='+')
     args = parser.parse_args(args)

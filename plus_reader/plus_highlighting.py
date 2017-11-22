@@ -1,19 +1,21 @@
-import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
-from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent, QCursor
-from PyQt5.QtCore import QMargins
-from bisect import bisect_left
-import cv2  # pip install --upgrade opencv-python
-import numpy as np
 import logging
 import sys
 import traceback
+import cv2
+import numpy as np
+from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent
+from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QMenu, QSlider, QLabel
+from PyQt5.QtCore import Qt
+from cell_recognizer import find_filled_cells
+
 sys._excepthook = sys.excepthook
 
-def excepthook(excType, excValue, tracebackobj):
-    traceback.print_tb(tracebackobj)
-sys.excepthook = excepthook
 
+def excepthook(excType, excValue, tracebackobj):
+    traceback.print_tb(tracebackobj, excType, excValue)
+
+
+sys.excepthook = excepthook
 
 FILL_COLOR = np.array([[[0, 255, 255]]], dtype=np.uint8)
 BORDER_COLOR = np.array([[[0, 0, 255]]], dtype=np.uint8)
@@ -21,74 +23,10 @@ BORDER_WIDTH = 5
 MAX_SIZE = 800
 
 
-class ImageProcessor():
-    def __init__(self, image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns, *, show_borders=True):
-        """Сохраняем все данные в атрибутах, производим первичную раскраску"""
-        self.image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-        self.H, self.W, *_ = image.shape
-        self.filled_cells = filled_cells
-        self.coords_of_horiz_lns = coords_of_horiz_lns
-        self.coords_of_vert_lns = coords_of_vert_lns
-        self.BW = BORDER_WIDTH if show_borders else 0
-        self.initial_mark_filled_cells()
-
-    def toggle_highlight_cell(self, x_vert_ind, y_horiz_ind, *, initial_mode=False):
-        """Маркировка и снятие маркировки ячейки"""
-        FILL_COLOR = np.array([0, 255, 255], dtype=np.uint8)
-        ALPHA = .3
-        bw = self.BW
-        if x_vert_ind < 0 or x_vert_ind >= len(self.coords_of_vert_lns) - 1:
-            logging.error('Cell x-index out of range: {}, cor.range: {}-{}'.format(x_vert_ind, 0, len(self.coords_of_vert_lns) - 1))
-            return
-        if y_horiz_ind < 0 or y_horiz_ind >= len(self.coords_of_horiz_lns) - 1:
-            logging.error('Cell y-index out of range: {}, cor.range: {}-{}'.format(y_horiz_ind, 0, len(self.coords_of_horiz_lns) - 1))
-            return
-        h1, h2, v1, v2 = self.coords_of_horiz_lns[y_horiz_ind] + bw, self.coords_of_horiz_lns[y_horiz_ind + 1] - bw, \
-                         self.coords_of_vert_lns[x_vert_ind] + bw, self.coords_of_vert_lns[x_vert_ind + 1] - bw
-        if not initial_mode ^ self.filled_cells[y_horiz_ind][x_vert_ind]:  # initial_mode инвертирует логику
-            self.image[h1:h2, v1:v2, :] = (1-ALPHA) * self.image[h1:h2, v1:v2, :] + ALPHA*FILL_COLOR  # GBR, so it's yellow
-        elif not initial_mode and self.filled_cells[y_horiz_ind][x_vert_ind]:
-            self.image[h1:h2, v1:v2, :] = (self.image[h1:h2, v1:v2, :] - ALPHA*FILL_COLOR) / (1-ALPHA)
-        if not initial_mode:
-            self.filled_cells[y_horiz_ind][x_vert_ind] ^= True
-
-    def initial_mark_filled_cells(self):
-        """Выполнить первичную маркировку всех заполненных ячеек"""
-        for y_horiz_ind in range(len(self.coords_of_horiz_lns) - 1):
-            for x_vert_ind in range(len(self.coords_of_vert_lns) - 1):
-                self.toggle_highlight_cell(x_vert_ind, y_horiz_ind, initial_mode=True)
-        # Добавляем распознанные границы красным:
-        if self.BW:
-            bw = self.BW
-            for v_b in self.coords_of_vert_lns:
-                v1, v2 = v_b - bw, v_b + bw
-                self.image[:, v1:v2, :] = .7 * self.image[:, v1:v2, :] + .3 * BORDER_COLOR
-            for h_b in self.coords_of_horiz_lns:
-                h1, h2 = h_b - bw, h_b + bw
-                self.image[h1:h2, :, :] = .7 * self.image[h1:h2, :, :] + .3 * BORDER_COLOR
-
-    def coord_to_cell(self, x, y, w, h):
-        real_x_coord = x * self.W / w
-        real_y_coord = y * self.H / h
-        x_ind = bisect_left(self.coords_of_vert_lns, real_x_coord) - 1
-        y_ind = bisect_left(self.coords_of_horiz_lns, real_y_coord) - 1
-        if x_ind < 0 or y_ind < 0 or x_ind >= len(self.coords_of_vert_lns) - 1 or y_ind >= len(self.coords_of_horiz_lns) - 1:
-            res = None
-        else:
-            res = [x_ind, y_ind]
-        logging.info(str(res))
-        return res
-
-
-    def to_bin(self):
-        """Конвертнуть текущее состояние кортинки в бинарную строку для передачи в QT"""
-        retval, bin_image = cv2.imencode('.png', self.image)
-        return bin_image
-
-
 class Label(QWidget):
     def __init__(self, parent=None):
         QWidget.__init__(self, parent=parent)
+        self.page = self.parentWidget()
         self.p = None
 
     def setPixmap(self, p):
@@ -100,46 +38,165 @@ class Label(QWidget):
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
             painter.drawPixmap(self.rect(), self.p)
 
+    def contextMenuEvent(self, QContextMenuEvent):
+        cmenu = QMenu(self)
+        positionx = QContextMenuEvent.x()
+        positiony = QContextMenuEvent.y()
+        im_pos_x, im_pos_y = list(
+            map(int, self.page.image.window_coords_to_image_coords(positionx, positiony, self.width(), self.height())))
+        logging.info(str(positionx) + ' ' + str(positiony) + ' -> ' + str(im_pos_x) + ' ' + str(im_pos_y))
+        min_vline_dist = min(abs(im_pos_x - vl) for vl in self.page.image.coords_of_vert_lns)
+        min_hline_dist = min(abs(im_pos_y - vl) for vl in self.page.image.coords_of_horiz_lns)
+        self._actions = []
+        self._actions_objects = []
+        if min_hline_dist <= BORDER_WIDTH * 3:
+            DelHorAction = cmenu.addAction('Delete Horizontal line here')
+            self._actions.append('DelHorAction')
+            self._actions_objects.append(DelHorAction)
+        else:
+            AddHorAction = cmenu.addAction('Add Horizontal line here')
+            self._actions.append('AddHorAction')
+            self._actions_objects.append(AddHorAction)
+        if min_vline_dist <= BORDER_WIDTH * 3:
+            DelVertAction = cmenu.addAction('Delete Vertical line here')
+            self._actions.append('DelVertAction')
+            self._actions_objects.append(DelVertAction)
+        else:
+            AddVertAction = cmenu.addAction('Add Vertical line here')
+            self._actions.append('AddVertAction')
+            self._actions_objects.append(AddVertAction)
+        action = cmenu.exec_(self.mapToGlobal(QContextMenuEvent.pos()))
+        if action:
+            selected_action_index = self._actions_objects.index(action)
+            selected_action = self._actions[selected_action_index]
+            logging.info(str(selected_action))
+            # TODO работающих методов ещё нет поэтому этот кусок пока не нужен
+            method = getattr(self, selected_action)
+            method((im_pos_x, im_pos_y))
 
-class ScannedPageWidget(QWidget):
-    def __init__(self, image, parent=None):
-        QWidget.__init__(self, parent=parent)
-        self.image = image
-        self.lay = QVBoxLayout(self)
-        self.lay.setContentsMargins(0, 0, 0, 0)
-        self.lb = Label(self)
-        self.qp = QPixmap()
-        self.qp.loadFromData(self.image.to_bin())
-        self.lb.setPixmap(self.qp)
-        self.lay.addWidget(self.lb)
+    def AddHorAction(self, coords):
+        logging.info('ДОБАВИТЬ ГОРИЗОНТАЛЬ')
+        self.page.image.coords_of_horiz_lns.append(coords[1])  # TODO: Сделать бисектом
+        self.page.image.coords_of_horiz_lns.sort()
+        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
+                                                         self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.initial_mark_filled_cells()
+        self.page.reload_image()
+
+    def DelHorAction(self, coords):
+        logging.info('УДАЛИТЬ ГОРИЗОНТАЛЬ')
+        min_dist = float('inf')
+        min_line = float('inf')
+        for i in self.page.image.coords_of_horiz_lns:
+            dist = abs(i - coords[1])
+            if dist < min_dist:
+                min_dist = dist
+                min_line = i
+        self.page.image.coords_of_horiz_lns.remove(min_line)
+        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
+                                                    self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.initial_mark_filled_cells()
+        self.page.reload_image()
+
+    def DelVertAction(self, coords):
+        logging.info('УДАЛИТЬ ВЕРТИКАЛЬ')
+        min_dist = float('inf')
+        min_line = float('inf')
+        for i in self.page.image.coords_of_vert_lns:
+            dist = abs(i - coords[0])
+            if dist < min_dist:
+                min_dist = dist
+                min_line = i
+        self.page.image.coords_of_vert_lns.remove(min_line)
+        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
+                                                         self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.initial_mark_filled_cells()
+        self.page.reload_image()
+
+    def AddVertAction(self, coords):
+        logging.info('ДОБАВИТЬ ВЕРТИКАЛЬ')
+        self.page.image.coords_of_vert_lns.append(coords[0])
+        self.page.image.coords_of_vert_lns.sort()
+        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
+                                                    self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.initial_mark_filled_cells()
+        self.page.reload_image()
 
     def mousePressEvent(self, a0: QMouseEvent):
+        button_pressed = a0.button()
         cursor_pos_x = int(a0.x())
         cursor_pos_y = int(a0.y())
         logging.info(str(cursor_pos_x) + ' ' + str(cursor_pos_y))
-        cell_pos = self.image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.width(), self.height())
-        if cell_pos:
-            self.image.toggle_highlight_cell(*cell_pos)
+        if button_pressed == 1:
+            cell_pos = self.page.image.coord_to_cell(cursor_pos_x, cursor_pos_y, self.width(), self.height())
+            if cell_pos:
+                self.page.image.toggle_highlight_cell(*cell_pos)
+            self.page.reload_image()
+
+
+class ScannedPageWidget(QWidget):
+    def __init__(self, image):
+        super(ScannedPageWidget, self).__init__()
+        self.image = image
+        self.initUi()
+
+    def reload_image(self, *, update=True):
         self.qp.loadFromData(self.image.to_bin())
         self.lb.setPixmap(self.qp)
-        self.lb.update()
+        if update:
+            self.lb.update()
+
+    def initUi(self):
+        self.lay = QGridLayout(self)
+        self.lay.setSpacing(10)
+        self.lay.setContentsMargins(0, 0, 0, 0)
+
+        self.slide = QSlider(Qt.Horizontal, self)
+        self.slide.setFocusPolicy(Qt.NoFocus)
+        self.slide.setTickInterval(5)
+        self.slide.setMaximum(255)
+        self.slide.setMinimum(0)
+        self.slide.setTickPosition(QSlider.TicksBelow)
+        self.slide.setTickInterval(5)
+        self.slide.setValue(self.image.black_threshold)
+        self.slide.valueChanged.connect(self.sliderchange)
+        self.slide.sliderReleased.connect(self.valuechange)
+
+        self.lb = Label(self)
+        self.qp = QPixmap()
+        self.reload_image(update=False)
+
+        self.slval = QLabel(str(self.slide.sliderPosition()))
+
+        self.lay.addWidget(QLabel('Change B/W Threshold'), 0, 0)
+        self.lay.addWidget(self.slide, 0, 2)
+        self.lay.addWidget(self.slval, 0, 9)
+        self.lay.addWidget(self.lb, 1, 0, 10, 10)
+
+        self.setLayout(self.lay)
+
+    def sliderchange(self):
+        self.slval.setText(str(self.slide.sliderPosition()))
+
+    def valuechange(self):
+        self.image.black_threshold = self.slide.sliderPosition()
+        self.image.bitmap_lines_filled_cells_and_marking()
+        self.reload_image()
+
 
 def show(image):
     mx = max(image.H, image.W)
-    w_height, w_width = int(image.H/mx*MAX_SIZE), int(image.W/mx*MAX_SIZE),
+    w_height, w_width = int(image.H / mx * MAX_SIZE), int(image.W / mx * MAX_SIZE),
     app = QApplication(sys.argv)
     w = ScannedPageWidget(image)
     w.resize(w_width, w_height)
-    w.setFixedSize(w_width, w_height)
     w.show()
     app.exec_()
 
 
-def feature_qt(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns):
-    global image
-    image = ImageProcessor(gray_np_image, filled_cells, coords_of_horiz_lns, coords_of_vert_lns)
-    show(image)
-    return filled_cells
+def feature_qt(image_cls):
+    show(image_cls)
+    return image_cls.filled_cells
 
 
 if __name__ == '__main__':
