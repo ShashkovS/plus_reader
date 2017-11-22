@@ -9,7 +9,7 @@ BORDER_COLOR = np.array([[[0, 0, 255]]], dtype=np.uint8)
 BORDER_WIDTH = 5
 MAX_SIZE = 800
 DEBUG = False
-BLACK_THRESHOLD = 210
+
 
 
 def _dft_unmark_useless_cells(filled_cells):
@@ -20,7 +20,7 @@ def _dft_remove_useless_cells(filled_cells):
 
 
 class ImageProcessor():
-    def __init__(self, image, *, black_threshold=BLACK_THRESHOLD, show_borders=True):
+    def __init__(self, image, *, show_borders=True, black_threshold=210):
         self.black_threshold = black_threshold
         self.BW = BORDER_WIDTH if show_borders else 0
         if isinstance(image, np.ndarray):
@@ -43,19 +43,25 @@ class ImageProcessor():
         self.gray_np_image = _blur_image(self.gray_np_image)
         # Удаляем мусор
         self.gray_np_image = remove_background(self.gray_np_image)
-        # Делаем цветную копию для пометок
-        self.bgr_img_with_highlights = cv2.cvtColor(self.gray_np_image, cv2.COLOR_GRAY2BGR)
-        # Делаем весь процессинг, начиная с перехода в ЧБ
+        # Делаем мастшабную обработку
+        self.bitmap_lines_filled_cells_and_marking()
+
+    def bitmap_lines_filled_cells_and_marking(self):
+        # Создаём версию в ЧБ
+        self.create_bitmap()
+        # Делаем весь процессинг
         self.find_lines_coords()
         # Делаем первичную разметку
         self.filled_cells = find_filled_cells(self.image_without_lines, self.coords_of_horiz_lns, self.coords_of_vert_lns)
         # Делаем первичную маркировку распознанных ячеек
         self.initial_mark_filled_cells()
 
-    def find_lines_coords(self):
+    def create_bitmap(self):
         # Конвертим в ЧБ
         self.bitmap_np_image = _img_to_bitmap_np(self.gray_np_image, self.black_threshold)
         self.bitmap_np_image = _remove_dots_from_image(self.bitmap_np_image)
+
+    def find_lines_coords(self):
         # Определяем линии таблицы
         self.horizontal_lines = _find_lines_on_image(self.bitmap_np_image, 'horizontal')
         self.vertical_lines = _find_lines_on_image(self.bitmap_np_image, 'vertical')
@@ -86,6 +92,9 @@ class ImageProcessor():
 
     def initial_mark_filled_cells(self):
         """Выполнить первичную маркировку всех заполненных ячеек"""
+        # Делаем цветную копию для пометок
+        self.bgr_img_with_highlights = cv2.cvtColor(self.gray_np_image, cv2.COLOR_GRAY2BGR)
+        # Помечаем ячейки
         for y_horiz_ind in range(len(self.coords_of_horiz_lns) - 1):
             for x_vert_ind in range(len(self.coords_of_vert_lns) - 1):
                 self.toggle_highlight_cell(x_vert_ind, y_horiz_ind, initial_mode=True)

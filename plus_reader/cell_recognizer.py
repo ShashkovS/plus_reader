@@ -15,6 +15,8 @@ def recognize_cell(np_cell_image):
 def find_filled_cells(gray_np_image, coords_of_horiz_lns, coords_of_vert_lns):
     """Самая главная функция — определяет, заполнена ли ячейка
     """
+    if not coords_of_vert_lns or not coords_of_horiz_lns:
+        return np.zeros((1, 1), np.bool)
     rows, colums = len(coords_of_horiz_lns) - 1, len(coords_of_vert_lns) - 1
     filled = np.zeros((rows, colums), np.bool)
     for i in range(rows):
