@@ -6,21 +6,24 @@ from cell_recognizer import find_filled_cells
 
 FILL_COLOR = np.array([[[0, 255, 255]]], dtype=np.uint8)
 BORDER_COLOR = np.array([[[0, 0, 255]]], dtype=np.uint8)
-BORDER_WIDTH = 5
+BORDER_WIDTH = 3
 MAX_SIZE = 800
 DEBUG = False
-
+RESIZE_TO1 = 2400
+RESIZE_TO2 = 1600
+DEFAULT_BW_THRESHOLD = 220
 
 
 def _dft_unmark_useless_cells(filled_cells):
     return filled_cells
+
 
 def _dft_remove_useless_cells(filled_cells):
     return filled_cells
 
 
 class ImageProcessor():
-    def __init__(self, image, *, show_borders=True, black_threshold=210):
+    def __init__(self, image, *, show_borders=True, black_threshold=DEFAULT_BW_THRESHOLD):
         self.black_threshold = black_threshold
         self.BW = BORDER_WIDTH if show_borders else 0
         if isinstance(image, np.ndarray):
@@ -31,6 +34,11 @@ class ImageProcessor():
         # else:
         #     raise ValueError('Image should be instance of PIL.Image or numpy.array')
         # Конвертим в ЧБ
+        for resize_to in (RESIZE_TO1, RESIZE_TO2):
+            ch, cw, *_ = self.np_orig_image.shape
+            if max(ch, cw) > resize_to:
+                nch, ncw = ch * resize_to//max(ch, cw), cw * resize_to//max(ch, cw)
+                self.np_orig_image = cv2.resize(self.np_orig_image, (ncw, nch), interpolation=cv2.INTER_LANCZOS4)
         if self.np_orig_image.ndim == 3:
             self.gray_np_image = cv2.cvtColor(self.np_orig_image / 255, cv2.COLOR_BGR2GRAY)
         else:
@@ -166,7 +174,7 @@ def _align_image(img):
 
 
 def _blur_image(img):
-    blur = cv2.GaussianBlur(img, (7, 7), 0)
+    blur = cv2.GaussianBlur(img, (3, 3), 0)
     return blur
 
 
@@ -208,7 +216,6 @@ def _remove_dots_from_image(gray_np_image):
 def remove_background(gray_np_image):
     """Удаляет мелкий сор из изображения"""
     # TODO Ну треш же...
-    CONST_FOR_MEDIAN_BLUR = 75
     CONST_FOR_REALLY_BLACK = 100
     med = cv2.medianBlur(gray_np_image, 75)
     dif = cv2.add(gray_np_image, 255-med)
@@ -231,7 +238,7 @@ def _find_lines_on_image(gray_np_image, direction):
     im_height, im_width = gray_np_image.shape
     # Каждый пиксель будет размыт до квадрата с такой стороной
     # TODO: Здесь мутные константы, которые я подбирал руками для наших кондуитов. Это — треш
-    ERODE_SIZE = round((im_width + im_height) / 600)
+    ERODE_SIZE = round((im_width + im_height) / 400)
     MIN_LINE_LEN = round((im_width + im_height) / 15)
     EXPAND_LINE_LEN = round((im_width + im_height) / 6)
     EXPAND_LINE_WID = round((im_width + im_height) / 850)
@@ -272,7 +279,7 @@ def _remove_table_lines_on_image(gray_np_image, horizontal_lines, vertical_lines
     # Замажем чёрным всё, в окрестности чего много точек.
     # Почти все плюсы превратятся в "жирные" кляксы
     # TODO: Здесь мутные константы, которые я подбирал руками для наших кондуитов. Это — треш
-    img_no_lines = ~cv2.adaptiveThreshold(img_no_lines, 210, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 27, -9)
+    img_no_lines = ~cv2.adaptiveThreshold(img_no_lines, DEFAULT_BW_THRESHOLD, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 27, -9)
     # Вернём наместро сами плюсы
     img_no_lines = cv2.min(img_no_lines, gray_np_image)
     # Очистим точки в границах таблицы, чтобы не мешались
