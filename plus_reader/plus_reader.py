@@ -39,8 +39,6 @@ def prc_one_image(np_image):
     return image_cls.filled_cells
 
 
-
-
 def prc_all_images(iterable_of_np_images, njobs=1):
     stt = time()
     if njobs == 1:

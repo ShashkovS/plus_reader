@@ -13,7 +13,6 @@ RESIZE_TO1 = 2400
 RESIZE_TO2 = 1600
 DEFAULT_BW_THRESHOLD = 220
 
-
 def _dft_unmark_useless_cells(filled_cells):
     return filled_cells
 
@@ -38,7 +37,7 @@ class ImageProcessor():
             ch, cw, *_ = self.np_orig_image.shape
             if max(ch, cw) > resize_to:
                 nch, ncw = ch * resize_to//max(ch, cw), cw * resize_to//max(ch, cw)
-                self.np_orig_image = cv2.resize(self.np_orig_image, (ncw, nch), interpolation=cv2.INTER_LANCZOS4)
+                self.np_orig_image = cv2.resize(self.np_orig_image, (ncw, nch), interpolation=cv2.INTER_AREA)
         if self.np_orig_image.ndim == 3:
             self.gray_np_image = cv2.cvtColor(self.np_orig_image / 255, cv2.COLOR_BGR2GRAY)
         else:
