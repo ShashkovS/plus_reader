@@ -57,5 +57,5 @@ if __name__ == '__main__':
     images = extract_images_from_files('tst_01.pdf', pages_to_process=[0, 1])
     # images = extract_images_from_files('Scan11.pdf')
     for image in images:
-        print(feature_qt(ImageProcessor(image, unmark_useless_cells_func=unmark_useless_cells)))
+        print(feature_qt(ImageProcessor(image)))
 

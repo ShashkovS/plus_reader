@@ -122,12 +122,16 @@ class ImageProcessor():
         # Добавляем распознанные границы красным:
         if self.BW:
             bw = self.BW
+            top_v, bot_v = min(self.coords_of_horiz_lns), max(self.coords_of_horiz_lns)
+            left_h, right_h = min(self.coords_of_vert_lns), max(self.coords_of_vert_lns)
             for v_b in self.coords_of_vert_lns:
                 v1, v2 = v_b - bw, v_b + bw
-                self.bgr_img_with_highlights[:, v1:v2, :] = .7 * self.bgr_img_with_highlights[:, v1:v2, :] + .3 * BORDER_COLOR
+                self.bgr_img_with_highlights[top_v:bot_v, v1:v2, :] = \
+                    .7 * self.bgr_img_with_highlights[top_v:bot_v, v1:v2, :] + .3 * BORDER_COLOR
             for h_b in self.coords_of_horiz_lns:
                 h1, h2 = h_b - bw, h_b + bw
-                self.bgr_img_with_highlights[h1:h2, :, :] = .7 * self.bgr_img_with_highlights[h1:h2, :, :] + .3 * BORDER_COLOR
+                self.bgr_img_with_highlights[h1:h2, left_h:right_h, :] = \
+                    .7 * self.bgr_img_with_highlights[h1:h2, left_h:right_h, :] + .3 * BORDER_COLOR
 
     def coord_to_cell(self, x, y, w, h):
         real_x_coord, real_y_coord = self.window_coords_to_image_coords(x, y, w, h)
