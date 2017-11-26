@@ -2,16 +2,16 @@ import cv2
 import logging
 import numpy as np
 from bisect import bisect_left
-from cell_recognizer import find_filled_cells
+from cell_recognizer import ext_find_filled_cells
 
 FILL_COLOR = np.array([[[0, 255, 255]]], dtype=np.uint8)
 BORDER_COLOR = np.array([[[0, 0, 255]]], dtype=np.uint8)
-BORDER_WIDTH = 3
+BORDER_WIDTH = 2
 MAX_SIZE = 800
 DEBUG = False
 RESIZE_TO1 = 2400
 RESIZE_TO2 = 1600
-DEFAULT_BW_THRESHOLD = 220
+DEFAULT_BW_THRESHOLD = 230
 
 def _dft_unmark_useless_cells(filled_cells):
     return filled_cells
@@ -22,8 +22,12 @@ def _dft_remove_useless_cells(filled_cells):
 
 
 class ImageProcessor():
-    def __init__(self, image, *, show_borders=True, black_threshold=DEFAULT_BW_THRESHOLD):
+    def __init__(self, image, *,
+                 show_borders=True,
+                 black_threshold=DEFAULT_BW_THRESHOLD,
+                 unmark_useless_cells_func=None):
         self.black_threshold = black_threshold
+        self.unmark_useless_cells_func = unmark_useless_cells_func
         self.BW = BORDER_WIDTH if show_borders else 0
         if isinstance(image, np.ndarray):
             self.np_orig_image = image
@@ -53,13 +57,23 @@ class ImageProcessor():
         # Делаем мастшабную обработку
         self.bitmap_lines_filled_cells_and_marking()
 
+    def find_filled_cells(self):
+        # Делаем первичную разметку
+        self.filled_cells = ext_find_filled_cells(self.image_without_lines, self.coords_of_horiz_lns, self.coords_of_vert_lns)
+        # Возможно, отметки с некоторых ячеек нужно убрать, так как они никому не нужны
+        if self.unmark_useless_cells_func:
+            try:
+                self.filled_cells = self.unmark_useless_cells_func(self.filled_cells)
+            except Exception as e:
+                logging.error(e)
+
     def bitmap_lines_filled_cells_and_marking(self):
         # Создаём версию в ЧБ
         self.create_bitmap()
         # Делаем весь процессинг
         self.find_lines_coords()
-        # Делаем первичную разметку
-        self.filled_cells = find_filled_cells(self.image_without_lines, self.coords_of_horiz_lns, self.coords_of_vert_lns)
+        # Распознаём ячейки
+        self.find_filled_cells()
         # Делаем первичную маркировку распознанных ячеек
         self.initial_mark_filled_cells()
 
@@ -237,7 +251,7 @@ def _find_lines_on_image(gray_np_image, direction):
     im_height, im_width = gray_np_image.shape
     # Каждый пиксель будет размыт до квадрата с такой стороной
     # TODO: Здесь мутные константы, которые я подбирал руками для наших кондуитов. Это — треш
-    ERODE_SIZE = round((im_width + im_height) / 400)
+    ERODE_SIZE = round((im_width + im_height) / 600)
     MIN_LINE_LEN = round((im_width + im_height) / 15)
     EXPAND_LINE_LEN = round((im_width + im_height) / 6)
     EXPAND_LINE_WID = round((im_width + im_height) / 850)

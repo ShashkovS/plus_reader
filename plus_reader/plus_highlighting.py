@@ -5,7 +5,6 @@ import numpy as np
 from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QMenu, QSlider, QLabel
 from PyQt5.QtCore import Qt
-from cell_recognizer import find_filled_cells
 
 sys._excepthook = sys.excepthook
 
@@ -77,8 +76,7 @@ class Label(QWidget):
         logging.info('ДОБАВИТЬ ГОРИЗОНТАЛЬ')
         self.page.image.coords_of_horiz_lns.append(coords[1])  # TODO: Сделать бисектом
         self.page.image.coords_of_horiz_lns.sort()
-        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
-                                                         self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.find_filled_cells()
         self.page.image.initial_mark_filled_cells()
         self.page.reload_image()
 
@@ -92,8 +90,7 @@ class Label(QWidget):
                 min_dist = dist
                 min_line = i
         self.page.image.coords_of_horiz_lns.remove(min_line)
-        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
-                                                    self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.find_filled_cells()
         self.page.image.initial_mark_filled_cells()
         self.page.reload_image()
 
@@ -107,8 +104,7 @@ class Label(QWidget):
                 min_dist = dist
                 min_line = i
         self.page.image.coords_of_vert_lns.remove(min_line)
-        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
-                                                         self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.find_filled_cells()
         self.page.image.initial_mark_filled_cells()
         self.page.reload_image()
 
@@ -116,8 +112,7 @@ class Label(QWidget):
         logging.info('ДОБАВИТЬ ВЕРТИКАЛЬ')
         self.page.image.coords_of_vert_lns.append(coords[0])
         self.page.image.coords_of_vert_lns.sort()
-        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
-                                                    self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.find_filled_cells()
         self.page.image.initial_mark_filled_cells()
         self.page.reload_image()
 
