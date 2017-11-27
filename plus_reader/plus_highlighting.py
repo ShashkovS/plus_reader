@@ -43,8 +43,10 @@ class Label(QWidget):
         im_pos_x, im_pos_y = list(
             map(int, self.page.image.window_coords_to_image_coords(positionx, positiony, self.width(), self.height())))
         logging.info(str(positionx) + ' ' + str(positiony) + ' -> ' + str(im_pos_x) + ' ' + str(im_pos_y))
-        min_vline_dist = min(abs(im_pos_x - vl) for vl in self.page.image.coords_of_vert_lns)
-        min_hline_dist = min(abs(im_pos_y - vl) for vl in self.page.image.coords_of_horiz_lns)
+        min_vline_dist = min(abs(im_pos_x - vl) for vl in self.page.image.coords_of_vert_lns) if self.page.image.coords_of_vert_lns\
+            else float('inf')
+        min_hline_dist = min(abs(im_pos_y - vl) for vl in self.page.image.coords_of_horiz_lns) if self.page.image.coords_of_horiz_lns\
+            else float('inf')
         self._actions = []
         self._actions_objects = []
         if min_hline_dist <= BORDER_WIDTH * 3:

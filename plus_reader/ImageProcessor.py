@@ -120,7 +120,7 @@ class ImageProcessor():
             for x_vert_ind in range(len(self.coords_of_vert_lns) - 1):
                 self.toggle_highlight_cell(x_vert_ind, y_horiz_ind, initial_mode=True)
         # Добавляем распознанные границы красным:
-        if self.BW:
+        if self.BW and self.coords_of_horiz_lns and self.coords_of_vert_lns:
             bw = self.BW
             top_v, bot_v = min(self.coords_of_horiz_lns), max(self.coords_of_horiz_lns)
             left_h, right_h = min(self.coords_of_vert_lns), max(self.coords_of_vert_lns)
