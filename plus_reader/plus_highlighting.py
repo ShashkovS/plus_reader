@@ -15,10 +15,7 @@ def excepthook(excType, excValue, tracebackobj):
 
 sys.excepthook = excepthook
 
-FILL_COLOR = np.array([[[0, 255, 255]]], dtype=np.uint8)
-BORDER_COLOR = np.array([[[0, 0, 255]]], dtype=np.uint8)
-BORDER_WIDTH = 5
-MAX_SIZE = 800
+VIRTUAL_BORDER_WIDTH = 5
 
 
 class Label(QWidget):
@@ -49,7 +46,7 @@ class Label(QWidget):
             else float('inf')
         self._actions = []
         self._actions_objects = []
-        if min_hline_dist <= BORDER_WIDTH * 3:
+        if min_hline_dist <= VIRTUAL_BORDER_WIDTH * 3:
             DelHorAction = cmenu.addAction('Delete Horizontal line here')
             self._actions.append('DelHorAction')
             self._actions_objects.append(DelHorAction)
@@ -57,7 +54,7 @@ class Label(QWidget):
             AddHorAction = cmenu.addAction('Add Horizontal line here')
             self._actions.append('AddHorAction')
             self._actions_objects.append(AddHorAction)
-        if min_vline_dist <= BORDER_WIDTH * 3:
+        if min_vline_dist <= VIRTUAL_BORDER_WIDTH * 3:
             DelVertAction = cmenu.addAction('Delete Vertical line here')
             self._actions.append('DelVertAction')
             self._actions_objects.append(DelVertAction)
@@ -181,9 +178,10 @@ class ScannedPageWidget(QWidget):
 
 
 def show(image):
-    mx = max(image.H, image.W)
-    w_height, w_width = int(image.H / mx * MAX_SIZE), int(image.W / mx * MAX_SIZE),
     app = QApplication(sys.argv)
+    _, _, screen_w, screen_h = app.primaryScreen().availableGeometry().getRect()
+    img_scale = max(image.W / screen_w, image.H / screen_h)
+    w_height, w_width = int(image.H / img_scale), int(image.W / img_scale),
     w = ScannedPageWidget(image)
     w.resize(w_width, w_height)
     w.show()
