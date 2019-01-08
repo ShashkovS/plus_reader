@@ -3,3 +3,4 @@ dist/
 plus_reader.egg-info/
 /**/__pycache__/
 /**/.idea/
+plus_reader/tests/test_imgs&pdfs/Scan11.pdf

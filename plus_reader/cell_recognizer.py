@@ -12,7 +12,7 @@ def recognize_cell(np_cell_image):
     return (part >= MIN_FILLED_PART or np_cell_image[np_cell_image < BLACK_DOT_THRESHOLD].size >= MIN_FILLED_DOTS)
 
 
-def find_filled_cells(gray_np_image, coords_of_horiz_lns, coords_of_vert_lns):
+def ext_find_filled_cells(gray_np_image, coords_of_horiz_lns, coords_of_vert_lns):
     """Самая главная функция — определяет, заполнена ли ячейка
     """
     if not coords_of_vert_lns or not coords_of_horiz_lns:

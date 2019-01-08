@@ -1,12 +1,10 @@
 import logging
 import sys
 import traceback
-import cv2
 import numpy as np
 from PyQt5.QtGui import QPixmap, QPainter, QMouseEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QMenu, QSlider, QLabel
 from PyQt5.QtCore import Qt
-from cell_recognizer import find_filled_cells
 
 sys._excepthook = sys.excepthook
 
@@ -17,10 +15,7 @@ def excepthook(excType, excValue, tracebackobj):
 
 sys.excepthook = excepthook
 
-FILL_COLOR = np.array([[[0, 255, 255]]], dtype=np.uint8)
-BORDER_COLOR = np.array([[[0, 0, 255]]], dtype=np.uint8)
-BORDER_WIDTH = 5
-MAX_SIZE = 800
+VIRTUAL_BORDER_WIDTH = 5
 
 
 class Label(QWidget):
@@ -45,11 +40,13 @@ class Label(QWidget):
         im_pos_x, im_pos_y = list(
             map(int, self.page.image.window_coords_to_image_coords(positionx, positiony, self.width(), self.height())))
         logging.info(str(positionx) + ' ' + str(positiony) + ' -> ' + str(im_pos_x) + ' ' + str(im_pos_y))
-        min_vline_dist = min(abs(im_pos_x - vl) for vl in self.page.image.coords_of_vert_lns)
-        min_hline_dist = min(abs(im_pos_y - vl) for vl in self.page.image.coords_of_horiz_lns)
+        min_vline_dist = min(abs(im_pos_x - vl) for vl in self.page.image.coords_of_vert_lns) if self.page.image.coords_of_vert_lns\
+            else float('inf')
+        min_hline_dist = min(abs(im_pos_y - vl) for vl in self.page.image.coords_of_horiz_lns) if self.page.image.coords_of_horiz_lns\
+            else float('inf')
         self._actions = []
         self._actions_objects = []
-        if min_hline_dist <= BORDER_WIDTH * 3:
+        if min_hline_dist <= VIRTUAL_BORDER_WIDTH * 3:
             DelHorAction = cmenu.addAction('Delete Horizontal line here')
             self._actions.append('DelHorAction')
             self._actions_objects.append(DelHorAction)
@@ -57,7 +54,7 @@ class Label(QWidget):
             AddHorAction = cmenu.addAction('Add Horizontal line here')
             self._actions.append('AddHorAction')
             self._actions_objects.append(AddHorAction)
-        if min_vline_dist <= BORDER_WIDTH * 3:
+        if min_vline_dist <= VIRTUAL_BORDER_WIDTH * 3:
             DelVertAction = cmenu.addAction('Delete Vertical line here')
             self._actions.append('DelVertAction')
             self._actions_objects.append(DelVertAction)
@@ -78,8 +75,7 @@ class Label(QWidget):
         logging.info('ДОБАВИТЬ ГОРИЗОНТАЛЬ')
         self.page.image.coords_of_horiz_lns.append(coords[1])  # TODO: Сделать бисектом
         self.page.image.coords_of_horiz_lns.sort()
-        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
-                                                         self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.find_filled_cells()
         self.page.image.initial_mark_filled_cells()
         self.page.reload_image()
 
@@ -93,8 +89,7 @@ class Label(QWidget):
                 min_dist = dist
                 min_line = i
         self.page.image.coords_of_horiz_lns.remove(min_line)
-        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
-                                                    self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.find_filled_cells()
         self.page.image.initial_mark_filled_cells()
         self.page.reload_image()
 
@@ -108,8 +103,7 @@ class Label(QWidget):
                 min_dist = dist
                 min_line = i
         self.page.image.coords_of_vert_lns.remove(min_line)
-        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
-                                                         self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.find_filled_cells()
         self.page.image.initial_mark_filled_cells()
         self.page.reload_image()
 
@@ -117,8 +111,7 @@ class Label(QWidget):
         logging.info('ДОБАВИТЬ ВЕРТИКАЛЬ')
         self.page.image.coords_of_vert_lns.append(coords[0])
         self.page.image.coords_of_vert_lns.sort()
-        self.page.image.filled_cells = find_filled_cells(self.page.image.image_without_lines,
-                                                    self.page.image.coords_of_horiz_lns, self.page.image.coords_of_vert_lns)
+        self.page.image.find_filled_cells()
         self.page.image.initial_mark_filled_cells()
         self.page.reload_image()
 
@@ -185,9 +178,10 @@ class ScannedPageWidget(QWidget):
 
 
 def show(image):
-    mx = max(image.H, image.W)
-    w_height, w_width = int(image.H / mx * MAX_SIZE), int(image.W / mx * MAX_SIZE),
     app = QApplication(sys.argv)
+    _, _, screen_w, screen_h = app.primaryScreen().availableGeometry().getRect()
+    img_scale = max(image.W / screen_w, image.H / screen_h)
+    w_height, w_width = int(image.H / img_scale), int(image.W / img_scale),
     w = ScannedPageWidget(image)
     w.resize(w_width, w_height)
     w.show()
